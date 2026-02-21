@@ -1,0 +1,30 @@
+{
+  "name": "hourglass",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hourglass — AI agent orchestration platform",
+  "workspaces": [
+    "server",
+    "ui"
+  ],
+  "scripts": {
+    "dev": "npm run dev:server & npm run dev:ui",
+    "dev:server": "npm run start:dev -w server",
+    "dev:ui": "npm run dev -w ui",
+    "build": "npm run build -w server && npm run build -w ui",
+    "build:server": "npm run build -w server",
+    "build:ui": "npm run build -w ui",
+    "start": "npm run start -w server",
+    "start:ui": "npm run start -w ui",
+    "typecheck": "npm run typecheck -w server",
+    "lint": "npm run lint -w server && npm run lint -w ui",
+    "test": "npm run test -w server",
+    "db:generate": "npm run db:generate -w server",
+    "db:migrate": "npm run db:migrate -w server",
+    "db:push": "npm run db:push -w server"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT"
+}
