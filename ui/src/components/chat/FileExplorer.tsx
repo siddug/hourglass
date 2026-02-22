@@ -394,6 +394,29 @@ export function FileExplorer({ initialPath, mode, onSelect, onCancel }: FileExpl
         <span className="text-sm text-gray-600 dark:text-gray-300 truncate font-mono">
           {selectedPath || columns[0]?.path || '~'}
         </span>
+        {/* Download button in path bar */}
+        {selectedPath && (
+          <div className="ml-auto shrink-0">
+            {downloadingPath === selectedPath ? (
+              <Spinner className="w-4 h-4" />
+            ) : (
+              <button
+                onClick={() => {
+                  setDownloadingPath(selectedPath);
+                  (selectedType === 'directory' ? downloadDirectory(selectedPath) : downloadFile(selectedPath))
+                    .catch(() => {})
+                    .finally(() => setDownloadingPath(null));
+                }}
+                className="p-1.5 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                title={selectedType === 'directory' ? 'Download as zip' : 'Download file'}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Main content: columns + preview */}
@@ -462,7 +485,7 @@ export function FileExplorer({ initialPath, mode, onSelect, onCancel }: FileExpl
                                       .catch(() => {})
                                       .finally(() => setDownloadingPath(null));
                                   }}
-                                  className={`ml-auto shrink-0 opacity-0 group-hover/entry:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 ${isSelected ? 'text-white' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
+                                  className={`ml-auto shrink-0 hidden sm:block opacity-0 group-hover/entry:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 ${isSelected ? 'text-white' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
                                   title="Download as zip"
                                 >
                                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -486,7 +509,7 @@ export function FileExplorer({ initialPath, mode, onSelect, onCancel }: FileExpl
                                     .catch(() => {})
                                     .finally(() => setDownloadingPath(null));
                                 }}
-                                className={`ml-auto shrink-0 opacity-0 group-hover/entry:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 ${isSelected ? 'text-white' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
+                                className={`ml-auto shrink-0 hidden sm:block opacity-0 group-hover/entry:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 ${isSelected ? 'text-white' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
                                 title="Download file"
                               >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

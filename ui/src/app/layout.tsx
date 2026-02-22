@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ServerProvider } from "@/contexts/ServerContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -13,6 +13,13 @@ export const metadata: Metadata = {
       { url: "/hourglass.svg", type: "image/svg+xml" },
     ],
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
