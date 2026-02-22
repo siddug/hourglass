@@ -34,6 +34,7 @@ interface SessionCreateFormProps {
   showCancelButton?: boolean;
   showSaveToTriageButton?: boolean;
   showScheduleButton?: boolean;
+  initialWorkDir?: string;
 }
 
 export function SessionCreateForm({
@@ -43,6 +44,7 @@ export function SessionCreateForm({
   showCancelButton = false,
   showSaveToTriageButton = false,
   showScheduleButton = false,
+  initialWorkDir,
 }: SessionCreateFormProps) {
   const { servers, addServer, switchServer } = useServer();
   const [connectors, setConnectors] = useState<Connector[]>([]);
@@ -56,7 +58,7 @@ export function SessionCreateForm({
   const [validated, setValidated] = useState<{ name: string; url: string } | null>(null);
 
   // Form state
-  const [workDir, setWorkDir] = useState('~/Documents');
+  const [workDir, setWorkDir] = useState(initialWorkDir || '~/Documents');
   const [connector, setConnector] = useState('');
   const [prompt, setPrompt] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -752,6 +754,16 @@ export function SessionCreateForm({
             >
               {submittingToTriage ? <Spinner className="h-4 w-4 mr-2" /> : null}
               Save to Triage
+            </Button>
+          )}
+          {showSaveToTriageButton && (
+            <Button
+              variant="primary"
+              onClick={() => handleSubmit(true)}
+              disabled={!connector || !workDir || !prompt.trim() || submitting || submittingSchedule}
+            >
+              {submitting && !submittingToTriage ? <Spinner className="h-4 w-4 mr-2" /> : null}
+              Start Now
             </Button>
           )}
         </div>

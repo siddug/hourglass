@@ -8,9 +8,10 @@ interface SessionCreateModalProps {
   onClose: () => void;
   onCreated: (sessionId?: string) => void;
   onScheduledTaskCreated?: () => void;
+  initialWorkDir?: string;
 }
 
-export function SessionCreateModal({ open, onClose, onCreated, onScheduledTaskCreated }: SessionCreateModalProps) {
+export function SessionCreateModal({ open, onClose, onCreated, onScheduledTaskCreated, initialWorkDir }: SessionCreateModalProps) {
   return (
     <Dialog open={open} onClose={onClose} title="New Session" className="max-w-4xl w-full" fullHeight>
       <SessionCreateForm
@@ -18,6 +19,7 @@ export function SessionCreateModal({ open, onClose, onCreated, onScheduledTaskCr
         showSaveToTriageButton
         showScheduleButton
         onCancel={onClose}
+        initialWorkDir={initialWorkDir}
         onSessionCreated={(sessionId) => {
           // Close the modal first to ensure immediate UI feedback
           onClose();

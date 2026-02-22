@@ -38,6 +38,7 @@ import {
   Input,
   Dropdown,
   IconButton,
+  Dialog,
 } from '@/components/ui';
 import { FileExplorer } from '@/components/chat/FileExplorer';
 import { GitExplorer } from '@/components/chat/GitExplorer';
@@ -77,6 +78,7 @@ export function SessionDetailView({
   // Session name editing
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const [showNameModal, setShowNameModal] = useState(false);
 
   // Auto-scroll refs
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -302,6 +304,7 @@ export function SessionDetailView({
       await updateSession(sessionId, { sessionName: nameInput });
       setSession({ ...session, sessionName: nameInput });
       setEditingName(false);
+      setShowNameModal(false);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to update session name');
     }
@@ -360,9 +363,10 @@ export function SessionDetailView({
         <div className={`${maxWidthClass} mx-auto px-4 py-3 overflow-hidden`}>
           <div className="flex items-center justify-between overflow-hidden w-full">
             <div className="flex overflow-hidden gap-3 mr-8">
-              
+
+              {/* Desktop: Inline editing, Mobile: Modal */}
               {editingName ? (
-                <div className="flex items-center gap-2">
+                <div className="hidden md:flex items-center gap-2">
                   <input
                     type="text"
                     value={nameInput}
@@ -374,27 +378,33 @@ export function SessionDetailView({
                   <Button size="sm" onClick={handleSaveName}>Save</Button>
                   <Button size="sm" variant="ghost" onClick={() => setEditingName(false)}>Cancel</Button>
                 </div>
-              ) : (
-                <div className="flex gap-1 shrink-1 overflow-x-hidden">
-                  <div className='truncate'>
-                    <span className="text-lg font-semibold truncate overflow-hidden">
-                      {session.sessionName || 'Session'}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setNameInput(session.sessionName || '');
-                      setEditingName(true);
-                    }}
-                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
-                    title="Edit session name"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                  </button>
+              ) : null}
+
+              {/* Show session name when not editing (desktop) or always (mobile) */}
+              <div className={`flex gap-1 shrink-1 overflow-x-hidden ${editingName ? 'md:hidden' : ''}`}>
+                <div className='truncate'>
+                  <span className="text-lg font-semibold truncate overflow-hidden">
+                    {session.sessionName || 'Session'}
+                  </span>
                 </div>
-              )}
+                <button
+                  onClick={() => {
+                    setNameInput(session.sessionName || '');
+                    // On mobile, show modal; on desktop, show inline
+                    if (window.innerWidth < 768) {
+                      setShowNameModal(true);
+                    } else {
+                      setEditingName(true);
+                    }
+                  }}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
+                  title="Edit session name"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <div className="flex items-center gap-2 shrink-0 grow-1 justify-end mr-2">
 
@@ -759,6 +769,46 @@ export function SessionDetailView({
           </div>
         </div>
       </div>}
+
+      {/* Session Name Edit Modal - Mobile Only */}
+      <Dialog
+        open={showNameModal}
+        onClose={() => {
+          setShowNameModal(false);
+          setNameInput(session?.sessionName || '');
+        }}
+        title="Edit Session Name"
+        className="max-w-md"
+      >
+        <div className="p-4 space-y-4">
+          <Input
+            type="text"
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            placeholder="Session name..."
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleSaveName();
+              }
+            }}
+          />
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowNameModal(false);
+                setNameInput(session?.sessionName || '');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleSaveName}>
+              Save
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

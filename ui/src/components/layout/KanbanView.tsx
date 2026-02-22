@@ -228,9 +228,8 @@ export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewPr
   return (
     <div className="flex flex-col h-full bg-[var(--bg)]">
       {/* Kanban Sub-header with Filters */}
-      <div className="flex-shrink-0 px-3 py-2 bg-gray-100 dark:bg-gray-900 border-b border-[var(--card-border)]">
-        <div className="flex items-center gap-4 flex-wrap">
-          <span className="text-sm text-gray-500">Filter:</span>
+      <div className="flex-shrink-0 relative px-3 py-2 bg-gray-100 dark:bg-gray-900 border-b border-[var(--card-border)]">
+        <div className="flex items-center gap-2 md:gap-4 overflow-x-auto">
           <WorkDirSwitcher
             workDirs={workDirsList}
             value={workDirFilter}
@@ -307,6 +306,7 @@ export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewPr
         onClose={closeCreateModal}
         onCreated={refresh}
         onScheduledTaskCreated={refreshScheduledTasks}
+        initialWorkDir={workDirFilter}
       />
 
       {/* Detail Modal */}
@@ -835,17 +835,17 @@ function ProjectSwitcher({ projects, value, onChange }: ProjectSwitcherProps) {
     : 'All Projects';
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="min-w-[140px] md:min-w-[180px]" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--input-border)] hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm cursor-pointer"
+        className="w-full flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 rounded-lg border border-[var(--input-border)] hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-xs md:text-sm cursor-pointer"
       >
-        <svg className="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
         <span className="flex-1 truncate text-left font-medium">{selectedLabel}</span>
         <svg
-          className={`w-4 h-4 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`w-3 h-3 md:w-4 md:h-4 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -926,17 +926,17 @@ function WorkDirSwitcher({ workDirs, value, onChange }: WorkDirSwitcherProps) {
   const selectedLabel = value ? getShortPath(value) : 'All Directories';
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="min-w-[140px] md:min-w-[180px]" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--input-border)] hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm cursor-pointer"
+        className="w-full flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 rounded-lg border border-[var(--input-border)] hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-xs md:text-sm cursor-pointer"
       >
-        <svg className="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
-        <span className="flex-1 truncate text-left font-medium max-w-[150px]">{selectedLabel}</span>
+        <span className="flex-1 truncate text-left font-medium">{selectedLabel}</span>
         <svg
-          className={`w-4 h-4 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`w-3 h-3 md:w-4 md:h-4 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -946,7 +946,7 @@ function WorkDirSwitcher({ workDirs, value, onChange }: WorkDirSwitcherProps) {
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg shadow-lg z-50 overflow-hidden min-w-[200px] max-w-[350px] max-h-[300px] overflow-y-auto">
+        <div className="absolute top-full left-0 mt-1 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg shadow-lg z-[100] overflow-hidden min-w-[200px] max-w-[350px] max-h-[300px] overflow-y-auto">
           <button
             onClick={() => { onChange(''); setOpen(false); }}
             className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors cursor-pointer ${

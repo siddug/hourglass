@@ -143,7 +143,7 @@ export async function generateSessionName(
 
 /**
  * Try to generate a session name using available API keys
- * Tries Anthropic first, then falls back to Mistral
+ * Tries Mistral first (faster & cheaper), then falls back to Anthropic
  * Retries each provider 3 times before giving up
  * @param prompt The user's prompt to generate a name from
  * @param apiKeys Object containing available API keys
@@ -155,43 +155,17 @@ export async function generateSessionNameWithFallback(
   apiKeys: { anthropic?: string; mistral?: string },
   maxRetries: number = 3
 ): Promise<string | null> {
-  // Try Anthropic first (since Claude Code connector uses it)
-  if (apiKeys.anthropic) {
-    let attempt = 0;
-    let lastError: unknown = null;
-    
-    while (attempt < maxRetries) {
-      attempt++;
-      try {
-        const name = await generateSessionName(prompt, apiKeys.anthropic, 'anthropic');
-        if (name) {
-          return name;
-        }
-      } catch (error) {
-        lastError = error;
-        console.log(`Anthropic session name generation attempt ${attempt} failed, retrying...`);
-        // Add a small delay between retries
-        if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      }
-    }
-    
-    if (lastError) {
-      console.error(`Anthropic session name generation failed after ${maxRetries} attempts:`, lastError);
-    }
-  }
-
-  // Fall back to Mistral
+  // Try Mistral first (faster and cheaper for simple tasks)
   if (apiKeys.mistral) {
     let attempt = 0;
     let lastError: unknown = null;
-    
+
     while (attempt < maxRetries) {
       attempt++;
       try {
         const name = await generateSessionName(prompt, apiKeys.mistral, 'mistral');
         if (name) {
+          console.log(`Successfully generated session name with Mistral on attempt ${attempt}`);
           return name;
         }
       } catch (error) {
@@ -203,9 +177,37 @@ export async function generateSessionNameWithFallback(
         }
       }
     }
-    
+
     if (lastError) {
       console.error(`Mistral session name generation failed after ${maxRetries} attempts:`, lastError);
+    }
+  }
+
+  // Fall back to Anthropic
+  if (apiKeys.anthropic) {
+    let attempt = 0;
+    let lastError: unknown = null;
+
+    while (attempt < maxRetries) {
+      attempt++;
+      try {
+        const name = await generateSessionName(prompt, apiKeys.anthropic, 'anthropic');
+        if (name) {
+          console.log(`Successfully generated session name with Anthropic on attempt ${attempt}`);
+          return name;
+        }
+      } catch (error) {
+        lastError = error;
+        console.log(`Anthropic session name generation attempt ${attempt} failed, retrying...`);
+        // Add a small delay between retries
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+    }
+
+    if (lastError) {
+      console.error(`Anthropic session name generation failed after ${maxRetries} attempts:`, lastError);
     }
   }
 
