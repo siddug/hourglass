@@ -1,8 +1,23 @@
 import { FastifyPluginAsync } from 'fastify';
 import { readdirSync, readFileSync, statSync, existsSync, createReadStream } from 'node:fs';
-import { join, extname, basename } from 'node:path';
+import { join, extname, basename, resolve } from 'node:path';
+import { homedir } from 'node:os';
 import archiver from 'archiver';
 import { expandHome } from '../../utils/paths.js';
+
+/**
+ * Validate that a resolved path is within the user's home directory.
+ * Returns the resolved absolute path, or null if the path escapes home.
+ */
+function validatePath(rawPath: string): string | null {
+  const expanded = expandHome(rawPath);
+  const resolved = resolve(expanded);
+  const home = homedir();
+  if (!resolved.startsWith(home + '/') && resolved !== home) {
+    return null;
+  }
+  return resolved;
+}
 
 const MIME_TYPES: Record<string, string> = {
   '.png': 'image/png',
@@ -34,7 +49,10 @@ const filesystemRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: 'path query parameter is required' });
     }
 
-    const resolvedPath = expandHome(rawPath);
+    const resolvedPath = validatePath(rawPath);
+    if (!resolvedPath) {
+      return reply.status(403).send({ error: 'Access denied: path is outside home directory' });
+    }
 
     if (!existsSync(resolvedPath)) {
       return reply.status(400).send({ error: `Path does not exist: ${rawPath}` });
@@ -87,7 +105,10 @@ const filesystemRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: 'path query parameter is required' });
     }
 
-    const resolvedPath = expandHome(rawPath);
+    const resolvedPath = validatePath(rawPath);
+    if (!resolvedPath) {
+      return reply.status(403).send({ error: 'Access denied: path is outside home directory' });
+    }
 
     if (!existsSync(resolvedPath)) {
       return reply.status(404).send({ error: `File not found: ${rawPath}` });
@@ -120,7 +141,10 @@ const filesystemRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: 'path query parameter is required' });
     }
 
-    const resolvedPath = expandHome(rawPath);
+    const resolvedPath = validatePath(rawPath);
+    if (!resolvedPath) {
+      return reply.status(403).send({ error: 'Access denied: path is outside home directory' });
+    }
 
     if (!existsSync(resolvedPath)) {
       return reply.status(404).send({ error: `File not found: ${rawPath}` });
@@ -179,7 +203,10 @@ const filesystemRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: 'path query parameter is required' });
     }
 
-    const resolvedPath = expandHome(rawPath);
+    const resolvedPath = validatePath(rawPath);
+    if (!resolvedPath) {
+      return reply.status(403).send({ error: 'Access denied: path is outside home directory' });
+    }
 
     if (!existsSync(resolvedPath)) {
       return reply.status(400).send({ error: `Path does not exist: ${rawPath}` });

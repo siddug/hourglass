@@ -244,11 +244,11 @@ export abstract class AbstractConnector implements BaseConnector {
  * Check if a command exists in PATH
  */
 export async function commandExists(command: string): Promise<boolean> {
-  const { execSync } = await import('node:child_process');
+  const { execFileSync } = await import('node:child_process');
   try {
     // Use 'which' on Unix, 'where' on Windows
     const cmd = process.platform === 'win32' ? 'where' : 'which';
-    execSync(`${cmd} ${command}`, { stdio: 'ignore' });
+    execFileSync(cmd, [command], { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -262,9 +262,9 @@ export async function getCommandVersion(
   command: string,
   versionFlag = '--version'
 ): Promise<string | null> {
-  const { execSync } = await import('node:child_process');
+  const { execFileSync } = await import('node:child_process');
   try {
-    const output = execSync(`${command} ${versionFlag}`, {
+    const output = execFileSync(command, [versionFlag], {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'ignore'],
     });

@@ -1,9 +1,9 @@
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /**
  * Git availability status
@@ -85,7 +85,7 @@ export async function checkGitAvailable(): Promise<GitAvailability> {
   }
 
   try {
-    const { stdout } = await execAsync('git --version', { timeout: 5000 });
+    const { stdout } = await execFileAsync('git', ['--version'], { timeout: 5000 });
     const version = stdout.trim().replace('git version ', '');
     gitAvailabilityCache = { available: true, version };
     return gitAvailabilityCache;
@@ -104,9 +104,9 @@ export async function checkGitAvailable(): Promise<GitAvailability> {
 /**
  * Execute a git command in a directory
  */
-async function execGit(cwd: string, args: string): Promise<{ stdout: string; stderr: string } | null> {
+async function execGit(cwd: string, args: string[]): Promise<{ stdout: string; stderr: string } | null> {
   try {
-    const result = await execAsync(`git ${args}`, {
+    const result = await execFileAsync('git', args, {
       cwd,
       timeout: 30000,
       maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large diffs
@@ -127,7 +127,7 @@ export async function isGitRepository(path: string): Promise<{ isRepo: boolean; 
     return { isRepo: false };
   }
 
-  const result = await execGit(path, 'rev-parse --show-toplevel');
+  const result = await execGit(path, ['rev-parse', '--show-toplevel']);
   if (result && result.stdout) {
     return { isRepo: true, repoRoot: result.stdout.trim() };
   }
@@ -144,7 +144,7 @@ export async function getGitRepoInfo(repoPath: string): Promise<GitRepoInfo | nu
   }
 
   // Get current branch
-  const branchResult = await execGit(repoPath, 'rev-parse --abbrev-ref HEAD');
+  const branchResult = await execGit(repoPath, ['rev-parse', '--abbrev-ref', 'HEAD']);
   if (!branchResult) return null;
   const branch = branchResult.stdout.trim();
 
@@ -155,19 +155,19 @@ export async function getGitRepoInfo(repoPath: string): Promise<GitRepoInfo | nu
   };
 
   // Get remote tracking branch
-  const trackingResult = await execGit(repoPath, `rev-parse --abbrev-ref ${branch}@{upstream}`);
+  const trackingResult = await execGit(repoPath, ['rev-parse', '--abbrev-ref', `${branch}@{upstream}`]);
   if (trackingResult && trackingResult.stdout) {
     info.remoteBranch = trackingResult.stdout.trim();
   }
 
   // Get remote URL (for the default remote, usually 'origin')
-  const remoteResult = await execGit(repoPath, 'remote get-url origin');
+  const remoteResult = await execGit(repoPath, ['remote', 'get-url', 'origin']);
   if (remoteResult && remoteResult.stdout) {
     info.remoteUrl = remoteResult.stdout.trim();
   }
 
   // Get last commit info
-  const logResult = await execGit(repoPath, 'log -1 --format=%H|%h|%s|%an|%ar');
+  const logResult = await execGit(repoPath, ['log', '-1', '--format=%H|%h|%s|%an|%ar']);
   if (logResult && logResult.stdout) {
     const [hash, shortHash, message, author, date] = logResult.stdout.trim().split('|');
     info.lastCommit = { hash, shortHash, message, author, date };
@@ -175,7 +175,7 @@ export async function getGitRepoInfo(repoPath: string): Promise<GitRepoInfo | nu
 
   // Get ahead/behind counts if we have a tracking branch
   if (info.remoteBranch) {
-    const aheadBehindResult = await execGit(repoPath, `rev-list --left-right --count ${info.remoteBranch}...HEAD`);
+    const aheadBehindResult = await execGit(repoPath, ['rev-list', '--left-right', '--count', `${info.remoteBranch}...HEAD`]);
     if (aheadBehindResult && aheadBehindResult.stdout) {
       const [behind, ahead] = aheadBehindResult.stdout.trim().split(/\s+/).map(Number);
       info.ahead = ahead || 0;
@@ -280,7 +280,7 @@ export async function getGitStatus(path: string): Promise<GitStatus> {
   const info = await getGitRepoInfo(repoRoot);
 
   // Get status (porcelain for machine-readable output)
-  const statusResult = await execGit(repoRoot, 'status --porcelain');
+  const statusResult = await execGit(repoRoot, ['status', '--porcelain']);
   const changes = statusResult ? parseGitStatus(statusResult.stdout) : [];
 
   return {
@@ -310,18 +310,18 @@ export async function getFileDiff(repoPath: string, filePath: string, staged: bo
   const repoRoot = repoCheck.repoRoot!;
 
   // Check if file is untracked (new file not yet staged)
-  const statusResult = await execGit(repoRoot, `status --porcelain -- "${filePath}"`);
+  const statusResult = await execGit(repoRoot, ['status', '--porcelain', '--', filePath]);
   const isUntracked = statusResult?.stdout.startsWith('??') || statusResult?.stdout.startsWith('A ') || false;
   const isDeleted = statusResult?.stdout.includes('D') || false;
 
-  let diffArgs = staged ? 'diff --cached' : 'diff';
+  let diffArgs = staged ? ['diff', '--cached'] : ['diff'];
 
   // For untracked files, show the whole file as additions
   if (isUntracked && !staged) {
-    diffArgs = 'diff --no-index /dev/null';
+    diffArgs = ['diff', '--no-index', '/dev/null'];
   }
 
-  const diffResult = await execGit(repoRoot, `${diffArgs} -- "${filePath}"`);
+  const diffResult = await execGit(repoRoot, [...diffArgs, '--', filePath]);
 
   // If no diff result for untracked file, try to read the file content directly
   if (!diffResult?.stdout && isUntracked) {

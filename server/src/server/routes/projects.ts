@@ -319,7 +319,14 @@ export const projectsRoutes: FastifyPluginAsync = async (server) => {
       ? `${project.workspacePath}/${query.path}`
       : project.workspacePath;
 
-    return reply.redirect(`/api/filesystem/browse?path=${encodeURIComponent(browsePath)}`);
+    // Validate the resolved path stays within the project workspace
+    const { resolve } = await import('node:path');
+    const normalizedBrowsePath = resolve(browsePath);
+    if (!normalizedBrowsePath.startsWith(project.workspacePath)) {
+      return reply.status(403).send({ error: 'Access denied: path is outside project workspace' });
+    }
+
+    return reply.redirect(`/api/filesystem/browse?path=${encodeURIComponent(normalizedBrowsePath)}`);
   });
 
   // ─── Team Messages ─────────────────────────────────────────────────────────

@@ -130,10 +130,11 @@ export async function createServer(config: ServerConfig = {}): Promise<FastifyIn
   // Register WebSocket support
   await server.register(websocket);
 
-  // CORS handling (simple implementation)
+  // CORS handling — restrict to the configured public URL origin
   if (cors) {
+    const allowedOrigin = new URL(resolvedPublicUrl).origin;
     server.addHook('onRequest', async (request, reply) => {
-      reply.header('Access-Control-Allow-Origin', '*');
+      reply.header('Access-Control-Allow-Origin', allowedOrigin);
       reply.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
       reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 

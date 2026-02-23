@@ -15,10 +15,10 @@ declare global {
   }
 }
 
-// Default fallback URL
+// Default fallback URL — empty string means "same origin" (works behind a reverse proxy)
 const DEFAULT_API_BASE = typeof window !== 'undefined' && window.electronAPI
   ? 'http://localhost:7778'
-  : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:7778');
+  : (process.env.NEXT_PUBLIC_API_URL ?? '');
 
 // Active server config (set by ServerContext)
 let _activeServer: ServerConfig | null = null;
@@ -588,8 +588,18 @@ export async function respondToApproval(
 
 // WebSocket URL helper (returns URL without auth — use getWebSocketProtocols for auth)
 export function getWebSocketUrl(endpoint: string): string {
-  const wsBase = getApiBase().replace(/^http/, 'ws');
-  return `${wsBase}${endpoint}`;
+  const base = getApiBase();
+  if (base && /^https?:\/\//.test(base)) {
+    // Absolute URL — swap protocol
+    const wsBase = base.replace(/^http/, 'ws');
+    return `${wsBase}${endpoint}`;
+  }
+  // Relative base (same origin) — derive WebSocket URL from current page location
+  if (typeof window !== 'undefined') {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${window.location.host}${base}${endpoint}`;
+  }
+  return `ws://localhost${base}${endpoint}`;
 }
 
 /**

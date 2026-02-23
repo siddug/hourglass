@@ -163,30 +163,4 @@ export const apiKeysRoutes: FastifyPluginAsync = async (server) => {
     });
   });
 
-  /**
-   * GET /api/settings/api-keys/:provider/value
-   * Get the actual (unmasked) API key value for internal use
-   * This endpoint is intended for internal server use only
-   */
-  server.get<{ Params: { provider: string } }>('/settings/api-keys/:provider/value', async (request, reply) => {
-    const { provider } = request.params;
-
-    const key = db.db
-      .select()
-      .from(apiKeys)
-      .where(eq(apiKeys.provider, provider))
-      .get();
-
-    if (!key) {
-      return reply.status(404).send({
-        error: 'API key not found',
-        provider,
-      });
-    }
-
-    return reply.send({
-      provider,
-      apiKey: key.apiKey,
-    });
-  });
 };
