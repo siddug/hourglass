@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   getGitStatus,
   getGitDiff,
@@ -12,9 +12,24 @@ import {
 import { Button, Spinner } from '@/components/ui';
 import { FileExplorer } from './FileExplorer';
 
+// --- Comment types ---
+export interface DiffComment {
+  id: string;
+  lineIndex: number;
+  lineNumber: number | null; // Actual file line number (new for +/context, old for -)
+  lineContent: string;
+  lineType: 'added' | 'deleted' | 'context' | 'header';
+  text: string;
+}
+
+// All comments keyed by file path
+export type CommentsMap = Map<string, DiffComment[]>;
+
 interface GitExplorerProps {
   initialPath: string;
   onRepoChange?: (repoPath: string | null) => void;
+  sessionId?: string;
+  onSendComments?: (formattedMessage: string) => void;
 }
 
 type ViewState =
@@ -25,7 +40,40 @@ type ViewState =
   | { type: 'repo-view'; status: GitStatus }
   | { type: 'error'; error: string };
 
-export function GitExplorer({ initialPath, onRepoChange }: GitExplorerProps) {
+/** Format all comments into a structured prompt for the agent */
+function formatCommentsForAgent(comments: CommentsMap): string {
+  const sections: string[] = [];
+
+  for (const [filePath, fileComments] of comments) {
+    if (fileComments.length === 0) continue;
+
+    const lines = fileComments.map((c) => {
+      const typeLabel =
+        c.lineType === 'added' ? '(added)' :
+        c.lineType === 'deleted' ? '(deleted)' :
+        c.lineType === 'header' ? '(hunk)' : '';
+      const lineNum = c.lineNumber != null ? `Line ${c.lineNumber}` : `Diff line ${c.lineIndex + 1}`;
+      const lineRef = `${lineNum} ${typeLabel}`.trim();
+      const context = c.lineContent.trim() ? ` \`${c.lineContent.trim()}\`` : '';
+      return `- ${lineRef}${context}: "${c.text}"`;
+    });
+
+    sections.push(`**File: ${filePath}**\n${lines.join('\n')}`);
+  }
+
+  return `Please address these code review comments on your changes:\n\n${sections.join('\n\n')}`;
+}
+
+/** Count total comments across all files */
+function totalCommentCount(comments: CommentsMap): number {
+  let count = 0;
+  for (const fileComments of comments.values()) {
+    count += fileComments.length;
+  }
+  return count;
+}
+
+export function GitExplorer({ initialPath, onRepoChange, sessionId, onSendComments }: GitExplorerProps) {
   const [viewState, setViewState] = useState<ViewState>({ type: 'loading' });
   const [selectedFile, setSelectedFile] = useState<GitFileChange | null>(null);
   const [fileDiff, setFileDiff] = useState<GitDiff | null>(null);
@@ -34,6 +82,52 @@ export function GitExplorer({ initialPath, onRepoChange }: GitExplorerProps) {
     new Set(['added', 'modified', 'deleted', 'untracked', 'renamed'])
   );
   const [currentRepoPath, setCurrentRepoPath] = useState<string | null>(null);
+
+  // Comments state: Map<filePath, DiffComment[]>
+  const [comments, setComments] = useState<CommentsMap>(new Map());
+
+  const addComment = useCallback((filePath: string, comment: DiffComment) => {
+    setComments((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(filePath) || [];
+      next.set(filePath, [...existing, comment]);
+      return next;
+    });
+  }, []);
+
+  const editComment = useCallback((filePath: string, commentId: string, newText: string) => {
+    setComments((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(filePath);
+      if (!existing) return prev;
+      next.set(filePath, existing.map((c) => c.id === commentId ? { ...c, text: newText } : c));
+      return next;
+    });
+  }, []);
+
+  const deleteComment = useCallback((filePath: string, commentId: string) => {
+    setComments((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(filePath);
+      if (!existing) return prev;
+      const filtered = existing.filter((c) => c.id !== commentId);
+      if (filtered.length === 0) {
+        next.delete(filePath);
+      } else {
+        next.set(filePath, filtered);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleSendComments = useCallback(() => {
+    const total = totalCommentCount(comments);
+    if (total === 0) return;
+
+    const message = formatCommentsForAgent(comments);
+    onSendComments?.(message);
+    setComments(new Map());
+  }, [comments, onSendComments]);
 
   const loadGitStatus = useCallback(async (path: string) => {
     setViewState({ type: 'loading' });
@@ -108,6 +202,9 @@ export function GitExplorer({ initialPath, onRepoChange }: GitExplorerProps) {
       loadGitStatus(currentRepoPath);
     }
   };
+
+  const total = totalCommentCount(comments);
+  const canSend = total > 0 && (!!sessionId || !!onSendComments);
 
   // Render based on view state
   if (viewState.type === 'loading') {
@@ -217,6 +314,8 @@ export function GitExplorer({ initialPath, onRepoChange }: GitExplorerProps) {
   };
 
   const statusOrder: GitFileStatus[] = ['added', 'untracked', 'modified', 'deleted', 'renamed'];
+
+  const fileComments = selectedFile ? (comments.get(selectedFile.path) || []) : [];
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -334,27 +433,39 @@ export function GitExplorer({ initialPath, onRepoChange }: GitExplorerProps) {
                     </button>
                     {isExpanded && (
                       <div className="pb-1">
-                        {files.map((file) => (
-                          <button
-                            key={file.path}
-                            onClick={() => handleFileClick(file)}
-                            className={`w-full px-3 py-1.5 pl-8 flex items-center gap-2 text-left text-sm cursor-pointer transition-colors ${
-                              selectedFile?.path === file.path
-                                ? 'bg-blue-500 text-white'
-                                : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-[var(--text-primary)]'
-                            }`}
-                          >
-                            <span className={`font-mono text-xs ${selectedFile?.path === file.path ? 'text-white' : config.color}`}>
-                              {config.icon}
-                            </span>
-                            <span className="truncate font-mono text-xs">{file.path}</span>
-                            {file.staged && (
-                              <span className={`text-xs px-1 rounded ${selectedFile?.path === file.path ? 'bg-blue-400' : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'}`}>
-                                staged
+                        {files.map((file) => {
+                          const fileCommentCount = (comments.get(file.path) || []).length;
+                          return (
+                            <button
+                              key={file.path}
+                              onClick={() => handleFileClick(file)}
+                              className={`w-full px-3 py-1.5 pl-8 flex items-center gap-2 text-left text-sm cursor-pointer transition-colors ${
+                                selectedFile?.path === file.path
+                                  ? 'bg-blue-500 text-white'
+                                  : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-[var(--text-primary)]'
+                              }`}
+                            >
+                              <span className={`font-mono text-xs ${selectedFile?.path === file.path ? 'text-white' : config.color}`}>
+                                {config.icon}
                               </span>
-                            )}
-                          </button>
-                        ))}
+                              <span className="truncate font-mono text-xs">{file.path}</span>
+                              {file.staged && (
+                                <span className={`text-xs px-1 rounded ${selectedFile?.path === file.path ? 'bg-blue-400' : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'}`}>
+                                  staged
+                                </span>
+                              )}
+                              {fileCommentCount > 0 && (
+                                <span className={`ml-auto flex-shrink-0 text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                                  selectedFile?.path === file.path
+                                    ? 'bg-blue-400 text-white'
+                                    : 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
+                                }`}>
+                                  {fileCommentCount}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -375,6 +486,11 @@ export function GitExplorer({ initialPath, onRepoChange }: GitExplorerProps) {
                 <span className="text-sm font-mono truncate text-[var(--text-primary)]">
                   {selectedFile.path}
                 </span>
+                {fileComments.length > 0 && (
+                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-medium">
+                    {fileComments.length} comment{fileComments.length !== 1 ? 's' : ''}
+                  </span>
+                )}
               </div>
               <button
                 onClick={() => {
@@ -405,7 +521,14 @@ export function GitExplorer({ initialPath, onRepoChange }: GitExplorerProps) {
                       <span className="text-green-500">+{fileDiff.additions} additions</span>
                       <span className="text-red-500">-{fileDiff.deletions} deletions</span>
                     </div>
-                    <DiffView diff={fileDiff.diff} />
+                    <DiffView
+                      diff={fileDiff.diff}
+                      filePath={selectedFile.path}
+                      comments={fileComments}
+                      onAddComment={(comment) => addComment(selectedFile.path, comment)}
+                      onEditComment={(commentId, newText) => editComment(selectedFile.path, commentId, newText)}
+                      onDeleteComment={(commentId) => deleteComment(selectedFile.path, commentId)}
+                    />
                   </div>
                 )
               ) : (
@@ -417,14 +540,125 @@ export function GitExplorer({ initialPath, onRepoChange }: GitExplorerProps) {
           </div>
         )}
       </div>
+
+      {/* Sticky "Send to Agent" bar */}
+      {canSend && (
+        <div className="flex-shrink-0 border-t border-[var(--card-border)] bg-[var(--sidebar-bg)] px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
+              <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+              </svg>
+              <span className="font-medium">
+                {total} review comment{total !== 1 ? 's' : ''}
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                across {comments.size} file{comments.size !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setComments(new Map())}
+                className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 cursor-pointer px-2 py-1"
+              >
+                Clear all
+              </button>
+              <Button variant="primary" onClick={handleSendComments}>
+                Send to Agent
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-/**
- * Diff viewer component - renders unified diff with syntax highlighting
- */
-function DiffView({ diff }: { diff: string }) {
+// --- Interactive DiffView with inline commenting ---
+
+interface DiffViewProps {
+  diff: string;
+  filePath: string;
+  comments: DiffComment[];
+  onAddComment: (comment: DiffComment) => void;
+  onEditComment: (commentId: string, newText: string) => void;
+  onDeleteComment: (commentId: string) => void;
+}
+
+function getLineType(line: string): DiffComment['lineType'] {
+  if (line.startsWith('@@')) return 'header';
+  if (line.startsWith('+') && !line.startsWith('+++')) return 'added';
+  if (line.startsWith('-') && !line.startsWith('---')) return 'deleted';
+  return 'context';
+}
+
+/** Parsed line info with old/new file line numbers */
+interface ParsedDiffLine {
+  raw: string;
+  type: 'added' | 'deleted' | 'context' | 'header' | 'meta';
+  oldLineNum: number | null;
+  newLineNum: number | null;
+}
+
+/** Parse unified diff to compute old/new line numbers from @@ headers */
+function parseDiffLines(diff: string): ParsedDiffLine[] {
+  const rawLines = diff.split('\n');
+  const result: ParsedDiffLine[] = [];
+  let oldLine = 0;
+  let newLine = 0;
+
+  for (const raw of rawLines) {
+    const isMeta = raw.startsWith('diff ') || raw.startsWith('index ') || raw.startsWith('---') || raw.startsWith('+++');
+
+    if (raw.startsWith('@@')) {
+      // Parse hunk header: @@ -oldStart[,oldCount] +newStart[,newCount] @@
+      const match = raw.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (match) {
+        oldLine = parseInt(match[1], 10);
+        newLine = parseInt(match[2], 10);
+      }
+      result.push({ raw, type: 'header', oldLineNum: null, newLineNum: null });
+    } else if (isMeta) {
+      result.push({ raw, type: 'meta', oldLineNum: null, newLineNum: null });
+    } else if (raw.startsWith('+')) {
+      result.push({ raw, type: 'added', oldLineNum: null, newLineNum: newLine });
+      newLine++;
+    } else if (raw.startsWith('-')) {
+      result.push({ raw, type: 'deleted', oldLineNum: oldLine, newLineNum: null });
+      oldLine++;
+    } else {
+      // Context line
+      result.push({ raw, type: 'context', oldLineNum: oldLine, newLineNum: newLine });
+      oldLine++;
+      newLine++;
+    }
+  }
+
+  return result;
+}
+
+function DiffView({ diff, filePath, comments, onAddComment, onEditComment, onDeleteComment }: DiffViewProps) {
+  const [hoveredLine, setHoveredLine] = useState<number | null>(null);
+  const [commentingLine, setCommentingLine] = useState<number | null>(null);
+  const [commentText, setCommentText] = useState('');
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
+  const editInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Focus the comment textarea when opening
+  useEffect(() => {
+    if (commentingLine !== null && commentInputRef.current) {
+      commentInputRef.current.focus();
+    }
+  }, [commentingLine]);
+
+  useEffect(() => {
+    if (editingCommentId && editInputRef.current) {
+      editInputRef.current.focus();
+    }
+  }, [editingCommentId]);
+
   if (!diff) {
     return (
       <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
@@ -433,31 +667,251 @@ function DiffView({ diff }: { diff: string }) {
     );
   }
 
-  const lines = diff.split('\n');
+  const parsedLines = parseDiffLines(diff);
+
+  const handleAddComment = (lineIndex: number) => {
+    setCommentingLine(lineIndex);
+    setCommentText('');
+  };
+
+  const handleSubmitComment = (lineIndex: number) => {
+    if (!commentText.trim()) return;
+    const parsed = parsedLines[lineIndex];
+    if (!parsed) return;
+    const lineNumber = parsed.newLineNum ?? parsed.oldLineNum;
+    onAddComment({
+      id: `${filePath}-${lineIndex}-${Date.now()}`,
+      lineIndex,
+      lineNumber,
+      lineContent: parsed.raw,
+      lineType: getLineType(parsed.raw),
+      text: commentText.trim(),
+    });
+    setCommentingLine(null);
+    setCommentText('');
+  };
+
+  const handleStartEdit = (comment: DiffComment) => {
+    setEditingCommentId(comment.id);
+    setEditText(comment.text);
+  };
+
+  const handleSubmitEdit = () => {
+    if (!editingCommentId || !editText.trim()) return;
+    onEditComment(editingCommentId, editText.trim());
+    setEditingCommentId(null);
+    setEditText('');
+  };
+
+  const handleCommentKeyDown = (e: React.KeyboardEvent, lineIndex: number) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      handleSubmitComment(lineIndex);
+    } else if (e.key === 'Escape') {
+      setCommentingLine(null);
+      setCommentText('');
+    }
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      handleSubmitEdit();
+    } else if (e.key === 'Escape') {
+      setEditingCommentId(null);
+      setEditText('');
+    }
+  };
+
+  // Build a lookup: lineIndex -> comments on that line
+  const commentsByLine = new Map<number, DiffComment[]>();
+  for (const c of comments) {
+    const existing = commentsByLine.get(c.lineIndex) || [];
+    existing.push(c);
+    commentsByLine.set(c.lineIndex, existing);
+  }
+
+  // Compute max line number width for consistent column sizing
+  let maxNum = 0;
+  for (const pl of parsedLines) {
+    if (pl.oldLineNum != null && pl.oldLineNum > maxNum) maxNum = pl.oldLineNum;
+    if (pl.newLineNum != null && pl.newLineNum > maxNum) maxNum = pl.newLineNum;
+  }
+  const numWidth = Math.max(String(maxNum).length, 2);
 
   return (
     <pre className="text-xs font-mono leading-5 overflow-x-auto">
-      {lines.map((line, idx) => {
-        let className = 'px-2 whitespace-pre';
-        let prefix = ' ';
+      {parsedLines.map((parsed, idx) => {
+        let lineClass = 'whitespace-pre relative';
+        const isInteractive = parsed.type !== 'meta' && parsed.type !== 'header';
 
-        if (line.startsWith('@@')) {
-          className += ' bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300';
-        } else if (line.startsWith('+') && !line.startsWith('+++')) {
-          className += ' bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300';
-          prefix = '+';
-        } else if (line.startsWith('-') && !line.startsWith('---')) {
-          className += ' bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300';
-          prefix = '-';
-        } else if (line.startsWith('diff ') || line.startsWith('index ') || line.startsWith('---') || line.startsWith('+++')) {
-          className += ' text-gray-500 dark:text-gray-400';
+        if (parsed.type === 'header') {
+          lineClass += ' bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300';
+        } else if (parsed.type === 'added') {
+          lineClass += ' bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300';
+        } else if (parsed.type === 'deleted') {
+          lineClass += ' bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300';
+        } else if (parsed.type === 'meta') {
+          lineClass += ' text-gray-500 dark:text-gray-400';
         } else {
-          className += ' text-[var(--text-primary)]';
+          lineClass += ' text-[var(--text-primary)]';
         }
 
+        const lineComments = commentsByLine.get(idx) || [];
+        const hasComments = lineComments.length > 0;
+        const isHovered = hoveredLine === idx;
+        const isCommenting = commentingLine === idx;
+
+        // Format line numbers
+        const oldNum = parsed.oldLineNum != null ? String(parsed.oldLineNum).padStart(numWidth, ' ') : ' '.repeat(numWidth);
+        const newNum = parsed.newLineNum != null ? String(parsed.newLineNum).padStart(numWidth, ' ') : ' '.repeat(numWidth);
+        const showLineNums = parsed.type !== 'meta';
+
         return (
-          <div key={idx} className={className}>
-            {line || ' '}
+          <div key={idx}>
+            {/* The diff line itself */}
+            <div
+              className={`${lineClass} group flex`}
+              onMouseEnter={() => isInteractive && setHoveredLine(idx)}
+              onMouseLeave={() => setHoveredLine(null)}
+            >
+              {/* Gutter: comment button */}
+              <span className="w-7 flex-shrink-0 flex items-center justify-center select-none">
+                {isInteractive && (isHovered || hasComments) ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAddComment(idx);
+                    }}
+                    className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold cursor-pointer transition-colors ${
+                      hasComments
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 opacity-0 group-hover:opacity-100'
+                    }`}
+                    title="Add comment"
+                  >
+                    {hasComments ? lineComments.length : '+'}
+                  </button>
+                ) : null}
+              </span>
+
+              {/* Line numbers: old | new */}
+              {showLineNums ? (
+                <>
+                  <span className="select-none text-gray-400 dark:text-gray-600 border-r border-gray-200 dark:border-gray-700 pr-1 text-right" style={{ minWidth: `${numWidth + 0.5}ch` }}>
+                    {oldNum}
+                  </span>
+                  <span className="select-none text-gray-400 dark:text-gray-600 border-r border-gray-200 dark:border-gray-700 px-1 text-right" style={{ minWidth: `${numWidth + 0.5}ch` }}>
+                    {newNum}
+                  </span>
+                </>
+              ) : (
+                <span className="select-none border-r border-gray-200 dark:border-gray-700 px-1" style={{ minWidth: `${(numWidth + 0.5) * 2 + 0.5}ch` }}> </span>
+              )}
+
+              {/* Line content */}
+              <span className="px-2 flex-1">{parsed.raw || ' '}</span>
+            </div>
+
+            {/* Existing comments on this line */}
+            {hasComments && (
+              <div className="ml-8 mr-2 my-1 space-y-1">
+                {lineComments.map((comment) => (
+                  <div
+                    key={comment.id}
+                    className="bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-md px-3 py-2 text-xs"
+                  >
+                    {editingCommentId === comment.id ? (
+                      // Edit mode
+                      <div>
+                        <textarea
+                          ref={editInputRef}
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          onKeyDown={handleEditKeyDown}
+                          className="w-full px-2 py-1.5 text-xs rounded border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none font-sans"
+                          rows={2}
+                        />
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <button
+                            onClick={handleSubmitEdit}
+                            className="text-xs px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 cursor-pointer font-sans"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => { setEditingCommentId(null); setEditText(''); }}
+                            className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 cursor-pointer font-sans"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      // Display mode
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-[var(--text-primary)] whitespace-pre-wrap font-sans">{comment.text}</p>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            onClick={() => handleStartEdit(comment)}
+                            className="p-0.5 text-gray-400 hover:text-blue-500 cursor-pointer"
+                            title="Edit comment"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => onDeleteComment(comment.id)}
+                            className="p-0.5 text-gray-400 hover:text-red-500 cursor-pointer"
+                            title="Delete comment"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Inline comment form (when user clicks "+") */}
+            {isCommenting && (
+              <div className="ml-8 mr-2 my-1 bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-700 rounded-md p-2 shadow-sm">
+                <textarea
+                  ref={commentInputRef}
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  onKeyDown={(e) => handleCommentKeyDown(e, idx)}
+                  placeholder="Add a review comment..."
+                  className="w-full px-2 py-1.5 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none font-sans"
+                  rows={2}
+                />
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="text-[10px] text-gray-400 font-sans">
+                    {navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+Enter to submit
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { setCommentingLine(null); setCommentText(''); }}
+                      className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 cursor-pointer font-sans"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleSubmitComment(idx)}
+                      disabled={!commentText.trim()}
+                      className="text-xs px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-sans"
+                    >
+                      Add Comment
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
       })}

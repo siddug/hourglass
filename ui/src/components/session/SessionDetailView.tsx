@@ -562,7 +562,24 @@ export function SessionDetailView({
       ) : activeTab === 'git' ? (
         /* Git Tab */
         <div className="flex-1 overflow-hidden flex flex-col">
-          <GitExplorer initialPath={session.workDir} />
+          <GitExplorer
+            initialPath={session.workDir}
+            sessionId={sessionId}
+            onSendComments={async (message) => {
+              setSubmitting(true);
+              try {
+                await sendFollowUp(sessionId, { prompt: message });
+                fetchedProcessesRef.current.clear();
+                setConversationTurns([]);
+                fetchSession();
+                setActiveTab('agent');
+              } catch (err) {
+                alert(err instanceof Error ? err.message : 'Failed to send review comments');
+              } finally {
+                setSubmitting(false);
+              }
+            }}
+          />
         </div>
       ) : activeTab === 'messages' && session.project ? (
         /* Messages Tab */
