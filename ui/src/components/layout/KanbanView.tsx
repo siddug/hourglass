@@ -22,12 +22,12 @@ import { ScheduledTaskDetailModal } from '@/components/scheduled/ScheduledTaskDe
 
 const COLUMNS: { status: SessionStatus; title: string; color: string; bgColor: string }[] = [
   { status: 'triage', title: 'Todo', color: 'bg-gray-400', bgColor: 'bg-gray-50 dark:bg-gray-800/50' },
-  { status: 'in_progress', title: 'Agent WIP', color: 'bg-yellow-400', bgColor: 'bg-yellow-50/30 dark:bg-yellow-900/10' },
-  { status: 'approval', title: 'Agent requires approval', color: 'bg-cyan-400', bgColor: 'bg-cyan-50/30 dark:bg-cyan-900/10' },
-  { status: 'completed', title: 'Agent completed', color: 'bg-green-400', bgColor: 'bg-green-50/30 dark:bg-green-900/10' },
-  { status: 'failed', title: 'Agent failed', color: 'bg-red-400', bgColor: 'bg-red-50/30 dark:bg-red-900/10' },
-  { status: 'done', title: 'Done', color: 'bg-emerald-500', bgColor: 'bg-emerald-50/30 dark:bg-emerald-900/10' },
-  { status: 'archived', title: 'Archive', color: 'bg-slate-500', bgColor: 'bg-slate-50/30 dark:bg-slate-900/10' },
+  { status: 'in_progress', title: 'Agent WIP', color: 'bg-gray-500', bgColor: 'bg-gray-50 dark:bg-gray-800/50' },
+  { status: 'approval', title: 'Agent requires approval', color: 'bg-gray-500', bgColor: 'bg-gray-50 dark:bg-gray-800/50' },
+  { status: 'completed', title: 'Agent completed', color: 'bg-gray-500', bgColor: 'bg-gray-50 dark:bg-gray-800/50' },
+  { status: 'failed', title: 'Agent failed', color: 'bg-gray-500', bgColor: 'bg-gray-50 dark:bg-gray-800/50' },
+  { status: 'done', title: 'Done', color: 'bg-gray-500', bgColor: 'bg-gray-50 dark:bg-gray-800/50' },
+  { status: 'archived', title: 'Archive', color: 'bg-gray-400', bgColor: 'bg-gray-50 dark:bg-gray-800/50' },
 ];
 
 interface KanbanViewProps {
@@ -558,13 +558,13 @@ function ScrollSentinel({ onIntersect, hasMore, loading }: ScrollSentinelProps) 
 // Priority Badge Component - maps session status to priority display
 function PriorityBadge({ status }: { status: SessionStatus }) {
   const config: Record<SessionStatus, { label: string; color: string; icon: string }> = {
-    failed: { label: 'High', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: '🔥' },
-    in_progress: { label: 'Medium', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400', icon: '⭐' },
-    approval: { label: 'Action', color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400', icon: '⏳' },
-    triage: { label: 'Low', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400', icon: '○' },
-    completed: { label: 'Done', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', icon: '✓' },
-    done: { label: 'Done', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', icon: '✓' },
-    archived: { label: 'Archived', color: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-500', icon: '📦' },
+    failed: { label: 'Failed', color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300', icon: '!' },
+    in_progress: { label: 'WIP', color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300', icon: '~' },
+    approval: { label: 'Action', color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300', icon: '?' },
+    triage: { label: 'Todo', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400', icon: '○' },
+    completed: { label: 'Done', color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300', icon: '✓' },
+    done: { label: 'Done', color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300', icon: '✓' },
+    archived: { label: 'Archived', color: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-500', icon: '-' },
   };
   const { label, color, icon } = config[status];
 
@@ -693,29 +693,28 @@ function SessionCard({ session, onDragStart, onDragEnd, onClick, isDragging, per
       <div className="flex flex-wrap gap-1 mb-0">
         <CategoryIcon type={session.connectorType} />
         {session.approvalMode === 'auto' && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md  text-green-700  dark:text-green-400">
-            Auto approval
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md text-gray-500 dark:text-gray-400">
+            Auto
           </span>
         )}
         {session.agentMode === 'plan' && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md  text-purple-700 dark:text-purple-400">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md text-gray-500 dark:text-gray-400">
             Plan
           </span>
         )}
         {personality && (
-          <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-md text-orange-700 dark:text-orange-400" title={personality.name}>
+          <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-md text-gray-500 dark:text-gray-400" title={personality.name}>
             {personality.readableId}
           </span>
         )}
         {project && (
-          <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-md text-indigo-700 dark:text-indigo-400" title={`Project: ${project.name}`}>
+          <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-md text-gray-500 dark:text-gray-400" title={`Project: ${project.name}`}>
             {project.name}
           </span>
         )}
-        {/* Loading spinner for in-progress sessions - bottom right */}
         {isInProgress && (
           <div className="ml-auto">
-            <Spinner className="h-4 w-4 text-blue-500" />
+            <Spinner className="h-4 w-4 text-gray-400" />
           </div>
         )}
       </div>

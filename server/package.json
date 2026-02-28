@@ -37,6 +37,7 @@
     "better-queue": "^3.8.12",
     "better-queue-sqlite": "^1.0.6",
     "better-sqlite3": "^11.6.0",
+    "cron-parser": "^5.5.0",
     "drizzle-orm": "^0.36.4",
     "fast-json-patch": "^3.1.1",
     "fastify": "^4.28.1",

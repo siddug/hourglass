@@ -260,7 +260,9 @@ export function SessionDetailView({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // On mobile/touch devices, Enter inserts newline (send via button only)
+    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (e.key === 'Enter' && !e.shiftKey && !isMobile) {
       e.preventDefault();
       if (!submitting && (followUpPrompt.trim() || followUpImages.length > 0)) {
         handleFollowUp();
@@ -444,12 +446,12 @@ export function SessionDetailView({
               </svg>
               <span className="font-mono truncate">{session.workDir}</span>
               {session.personality && (
-                <span className="ml-2 text-orange-600 dark:text-orange-400 font-medium">
+                <span className="ml-2 text-gray-500 dark:text-gray-400 font-medium">
                   {session.personality.readableId}
                 </span>
               )}
               {session.project && (
-                <span className="ml-2 text-indigo-600 dark:text-indigo-400 font-medium">
+                <span className="ml-2 text-gray-500 dark:text-gray-400 font-medium">
                   {session.project.name}
                 </span>
               )}
@@ -529,9 +531,9 @@ export function SessionDetailView({
 
               {/* Inline Approval Requests - only show in manual mode */}
               {pendingApprovals.length > 0 && session.approvalMode === 'manual' && (
-                <div id="inline-approvals" className="space-y-3 p-4 rounded-xl border-2 border-cyan-500 bg-cyan-50 dark:bg-cyan-900/20 animate-pulse-slow">
+                <div id="inline-approvals" className="space-y-3 p-4 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] animate-pulse-slow">
                   <div className="flex items-center gap-2">
-                    <span className="text-cyan-600 dark:text-cyan-400 font-medium">
+                    <span className="text-[var(--text-primary)] font-medium text-sm">
                       Action Required: {pendingApprovals.length} Pending Approval{pendingApprovals.length > 1 ? 's' : ''}
                     </span>
                   </div>
@@ -670,7 +672,7 @@ export function SessionDetailView({
               }
               rows={1}
               disabled={isRunning || !canFollowUp || submitting}
-              className="w-full px-4 py-3 text-sm rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50 disabled:cursor-not-allowed overflow-y-auto"
+              className="w-full px-4 py-3 text-sm rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] focus:outline-none resize-none disabled:opacity-50 disabled:cursor-not-allowed overflow-y-auto"
               style={{ minHeight: '44px', maxHeight: '140px' }}
             />
           </div>
@@ -717,8 +719,8 @@ export function SessionDetailView({
               <button
                 onClick={handleToggleMode}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${session.approvalMode === 'auto'
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50'
-                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50'
+                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                   }`}
                 title={session.approvalMode === 'auto'
                   ? 'All tool calls are being auto-approved. Click to switch to manual mode.'
@@ -726,13 +728,6 @@ export function SessionDetailView({
               >
                 {session.approvalMode === 'auto' ? 'Auto approve' : 'Manual'}
               </button>
-              {/* Spinner when agent is working */}
-              {isRunning && (
-                <div className="flex items-center gap-1 text-blue-500 text-sm">
-                  <Spinner className="w-4 h-4" />
-                  <span>Working...</span>
-                </div>
-              )}
             </div>
             <div className="flex items-center gap-1">
               {/* Image Upload Button */}
@@ -745,7 +740,7 @@ export function SessionDetailView({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </IconButton>
-              {/* Interrupt Button */}
+              {/* Interrupt Button (pause icon) */}
               <IconButton
                 onClick={handleInterrupt}
                 disabled={!isRunning}
@@ -753,32 +748,32 @@ export function SessionDetailView({
                 title="Interrupt"
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14h2v2h-2v-2zm0-12h2v10h-2V4z" />
+                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
                 </svg>
               </IconButton>
-              {/* Kill Button */}
+              {/* Kill Button (X icon) */}
               <IconButton
                 onClick={handleKill}
                 disabled={!isRunning}
                 variant="danger"
                 title="Kill"
               >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z" />
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </IconButton>
-              {/* Send Button */}
+              {/* Play / Send Button — shows spinner when agent is working */}
               <IconButton
                 onClick={handleFollowUp}
                 disabled={isRunning || !canFollowUp || submitting || (!followUpPrompt.trim() && followUpImages.length === 0)}
                 variant="primary"
-                title="Send"
+                title={isRunning ? 'Agent is working...' : 'Send'}
               >
-                {submitting ? (
+                {isRunning || submitting ? (
                   <Spinner className="w-5 h-5" />
                 ) : (
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                    <path d="M8 5v14l11-7z" />
                   </svg>
                 )}
               </IconButton>
@@ -1110,10 +1105,10 @@ function InlineApprovalCard({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-cyan-300 dark:border-cyan-700 overflow-hidden shadow-sm">
+    <div className="bg-[var(--card-bg)] rounded-lg border border-[var(--card-border)] overflow-hidden shadow-sm">
       <div className="flex items-center justify-between p-3">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <span className="text-cyan-600 dark:text-cyan-400 text-lg">🔧</span>
+          <span className="text-gray-500 dark:text-gray-400 text-lg">🔧</span>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium">{approval.toolName}</div>
             {!isExpanded && (
@@ -1614,8 +1609,8 @@ function ConversationTurnView({
             <span className="text-sm font-medium">You</span>
             <span className="text-xs text-gray-500">Turn {turnNumber}</span>
           </div>
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
-            <p className="whitespace-pre-wrap">{truncatedPrompt}</p>
+          <div className="rounded-lg p-3 bg-gray-100 dark:bg-gray-800">
+            <p className="whitespace-pre-wrap text-sm">{truncatedPrompt}</p>
             {isPromptLong && (
               <div className="flex justify-end mt-1">
                 <button
@@ -1652,8 +1647,8 @@ function ConversationTurnView({
             <span className="text-sm font-medium">{getConnectorDisplayName(connectorType)}</span>
             <StatusBadge status={process.status} />
             {isLive && isConnected && (
-              <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-pulse" />
                 Streaming
               </span>
             )}
@@ -1760,19 +1755,15 @@ function ConversationTurnView({
 
           {/* Final Result - Displayed prominently outside the collapsed section */}
           {finalResult && !isLive && (
-            <div className="bg-green-50 dark:bg-green-900/30 rounded-lg border border-green-200 dark:border-green-800 p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-green-700 dark:text-green-300 font-medium text-sm">Result</span>
-                {finalResult.cost && (
-                  <span className="text-green-600 dark:text-green-500 text-xs ml-auto">
+            <div className="pt-2">
+              {finalResult.cost && (
+                <div className="flex justify-end mb-1">
+                  <span className="text-xs text-gray-500">
                     Cost: ${finalResult.cost.toFixed(4)}
                   </span>
-                )}
-              </div>
-              <div className="text-green-800 dark:text-green-200 prose prose-sm prose-green dark:prose-invert max-w-none">
+                </div>
+              )}
+              <div className="text-[var(--text-primary)] prose prose-sm dark:prose-invert max-w-none">
                 <ReactMarkdown>{ensureString(finalResult.content)}</ReactMarkdown>
               </div>
             </div>
@@ -1797,53 +1788,52 @@ function ParsedLogLine({
   switch (parsed.type) {
     case 'assistant':
       return (
-        <div className="text-green-700 dark:text-green-300 whitespace-pre-wrap">
+        <div className="text-[var(--text-primary)] whitespace-pre-wrap text-sm">
           {content}
         </div>
       );
 
     case 'user':
       return (
-        <div className="border-l-2 border-cyan-500 pl-3 my-2 bg-cyan-50 dark:bg-cyan-900/20 p-2 rounded-r">
-          <div className="text-cyan-600 dark:text-cyan-400 text-xs mb-1">You</div>
-          <div className="text-cyan-800 dark:text-cyan-200 whitespace-pre-wrap">{content}</div>
+        <div className="border-l-2 border-gray-300 dark:border-gray-600 pl-3 my-2 p-2 rounded-r">
+          <div className="text-gray-500 dark:text-gray-400 text-xs mb-1">You</div>
+          <div className="text-[var(--text-primary)] whitespace-pre-wrap text-sm">{content}</div>
         </div>
       );
 
     case 'tool_call':
       return (
-        <div className="border-l-2 border-blue-500 pl-3 my-2">
-          <div className="text-blue-600 dark:text-blue-400 text-xs mb-1">{parsed.toolName}</div>
-          <pre className="text-blue-700 dark:text-blue-200 text-xs overflow-x-auto">{content}</pre>
+        <div className="border-l-2 border-gray-300 dark:border-gray-600 pl-3 my-2">
+          <div className="text-gray-500 dark:text-gray-400 text-xs mb-1">{parsed.toolName}</div>
+          <pre className="text-gray-700 dark:text-gray-300 text-xs overflow-x-auto">{content}</pre>
         </div>
       );
 
     case 'tool_result':
       return (
-        <div className={`border-l-2 ${parsed.isError ? 'border-red-500' : 'border-yellow-500'} pl-3 my-1 bg-gray-100 dark:bg-gray-800/50`}>
-          <div className={`text-xs mb-1 ${parsed.isError ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+        <div className={`border-l-2 ${parsed.isError ? 'border-red-400 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'} pl-3 my-1`}>
+          <div className={`text-xs mb-1 ${parsed.isError ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
             {parsed.isError ? 'Error' : 'Output'}
           </div>
-          <pre className={`text-xs overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto ${parsed.isError ? 'text-red-700 dark:text-red-200' : 'text-yellow-700 dark:text-yellow-200'}`}>
+          <pre className={`text-xs overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto ${parsed.isError ? 'text-red-600 dark:text-red-300' : 'text-gray-600 dark:text-gray-400'}`}>
             {content}
           </pre>
         </div>
       );
 
     case 'result':
-      // Results are now displayed outside the log container, so skip rendering here
       return null;
 
     case 'system':
       return (
-        <div className="text-purple-600 dark:text-purple-400 text-xs">
+        <div className="text-gray-500 dark:text-gray-400 text-xs">
           {content}
         </div>
       );
 
     case 'thinking':
       return (
-        <div className="text-yellow-600 dark:text-yellow-300/70 text-xs italic">
+        <div className="text-gray-400 dark:text-gray-500 text-xs italic">
           {content}
         </div>
       );
@@ -1851,7 +1841,7 @@ function ParsedLogLine({
     default:
       if (logType === 'stderr') {
         return (
-          <div className="text-red-600 dark:text-red-400 whitespace-pre-wrap break-all">
+          <div className="text-red-500 dark:text-red-400 whitespace-pre-wrap break-all text-xs">
             {content}
           </div>
         );

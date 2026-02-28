@@ -231,8 +231,8 @@ interface UserAvatarProps {
 
 export function UserAvatar({ className = '' }: UserAvatarProps) {
   return (
-    <div className={`w-6 h-6 flex items-center justify-center text-xl ${className}`}>
-      👤
+    <div className={`w-6 h-6 flex items-center justify-center ${className}`}>
+      <div className="w-5 h-5 rounded-full bg-gray-300 dark:bg-gray-600" />
     </div>
   );
 }

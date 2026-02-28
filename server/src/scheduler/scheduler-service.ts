@@ -1,4 +1,5 @@
 import cron, { type ScheduledTask as CronTask } from 'node-cron';
+import { CronExpressionParser } from 'cron-parser';
 import Queue from 'better-queue';
 import SqliteStore from 'better-queue-sqlite';
 import { eq, sql } from 'drizzle-orm';
@@ -985,13 +986,25 @@ export class SchedulerService extends EventEmitter {
    * Calculate the next run time for a cron expression
    */
   private getNextCronRun(expression: string, timezone: string): Date {
-    // node-cron doesn't expose next run calculation
-    // For simplicity, estimate next run as 1 minute from now
-    // The actual scheduling is handled by node-cron
-    const nextRun = new Date();
-    nextRun.setSeconds(0);
-    nextRun.setMilliseconds(0);
-    nextRun.setMinutes(nextRun.getMinutes() + 1);
-    return nextRun;
+    try {
+      // cron-parser expects 6-field expressions (with seconds)
+      // node-cron uses 5-field (min hour dom month dow) or 6-field
+      const fields = expression.trim().split(/\s+/);
+      const parserExpression = fields.length === 5 ? `0 ${expression}` : expression;
+
+      const parsed = CronExpressionParser.parse(parserExpression, {
+        tz: timezone,
+        currentDate: new Date(),
+      });
+      return parsed.next().toDate();
+    } catch (error) {
+      this.logger.warn({ expression, timezone, error }, 'Failed to parse cron expression for next run calculation');
+      // Fallback: 1 minute from now
+      const nextRun = new Date();
+      nextRun.setSeconds(0);
+      nextRun.setMilliseconds(0);
+      nextRun.setMinutes(nextRun.getMinutes() + 1);
+      return nextRun;
+    }
   }
 }

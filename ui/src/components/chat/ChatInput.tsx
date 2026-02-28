@@ -41,8 +41,10 @@ export function ChatInput({
   }, [value]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Enter to submit, Shift+Enter for newline
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // On mobile/touch devices, Enter inserts newline (send via button only)
+    // On desktop, Enter submits and Shift+Enter inserts newline
+    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (e.key === 'Enter' && !e.shiftKey && !isMobile) {
       e.preventDefault();
       if (!disabled && (value.trim() || images.length > 0)) {
         onSubmit();
@@ -178,7 +180,7 @@ export function ChatInput({
           placeholder={placeholder}
           disabled={disabled || submitting}
           rows={1}
-          className="w-full px-4 py-3 pr-24 text-sm rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full px-4 py-3 pr-24 text-sm rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] focus:outline-none resize-none disabled:opacity-50 disabled:cursor-not-allowed"
         />
 
         {/* Hidden file input */}
