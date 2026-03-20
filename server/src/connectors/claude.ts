@@ -115,6 +115,7 @@ export class ClaudeConnector extends AbstractConnector {
       startupTimeout,
       interactive: useInteractive,
       approvalService,
+      sandbox: this.claudeConfig.sandbox,
     });
 
     return this.wrapSpawnedProcess(spawned, workDir, approvalService);
@@ -144,6 +145,7 @@ export class ClaudeConnector extends AbstractConnector {
       startupTimeout,
       interactive: useInteractive,
       approvalService,
+      sandbox: this.claudeConfig.sandbox,
     });
 
     return this.wrapSpawnedProcess(spawned, workDir, approvalService);
@@ -214,10 +216,9 @@ For more information, visit: https://docs.anthropic.com/claude-code
       args.push('--verbose');
       // Note: We don't use --include-partial-messages as it causes duplicate/fragmented output
 
-      // Non-interactive mode: skip permissions (no approval possible)
-      if (this.claudeConfig.dangerouslySkipPermissions !== false) {
-        args.push('--dangerously-skip-permissions');
-      }
+      // Print mode requires --dangerously-skip-permissions because stdin is ignored,
+      // so there's no way to handle permission prompts interactively.
+      args.push('--dangerously-skip-permissions');
 
       // Add the prompt as the final argument (only in print mode)
       if (options.prompt) {

@@ -8,6 +8,7 @@
 import { randomBytes } from 'node:crypto';
 import { VibeServer, ClaudeConnector, VibeConnector } from '../index.js';
 import { loadConfig, saveConfig, getConfigPath } from '../utils/config.js';
+import { isSandboxSupported } from '../sandbox/index.js';
 
 const PORT = parseInt(process.env.PORT || '7778', 10);
 const HOST = process.env.HOST || 'localhost';
@@ -37,13 +38,32 @@ async function main() {
     publicUrl: serverUrl,
   });
 
+  // Build sandbox config from server config
+  const sandboxEnabled = config.sandbox.enabled && isSandboxSupported();
+  const sandboxConfig = sandboxEnabled
+    ? {
+        enabled: true,
+        allowNetwork: config.sandbox.allowNetwork,
+        additionalReadPaths: config.sandbox.additionalReadPaths,
+        additionalWritePaths: config.sandbox.additionalWritePaths,
+      }
+    : undefined;
+
+  if (sandboxEnabled) {
+    console.log('macOS sandbox enabled for agent processes');
+  } else if (config.sandbox.enabled && !isSandboxSupported()) {
+    console.log('Sandbox requested but not supported on this platform (macOS only)');
+  }
+
   // Register connectors
   const claude = new ClaudeConnector({
     dangerouslySkipPermissions: false,
+    sandbox: sandboxConfig,
   });
 
   const vibe = new VibeConnector({
     autoApprove: false,
+    sandbox: sandboxConfig,
   });
 
   // We need to start the server first to access the registry

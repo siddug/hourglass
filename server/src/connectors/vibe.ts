@@ -34,9 +34,9 @@ export interface VibeConnectorConfig extends ConnectorConfig {
  * Implements the BaseConnector interface for Mistral Vibe (Mistral's CLI agent).
  * Two-mode architecture matching Claude connector:
  *
- * - **Print mode** (default): Uses `vibe -p PROMPT --output streaming --auto-approve`
- *   One-shot execution with stdin ignored. Process exits after completion.
- *   Uses native `--resume SESSION_ID` for follow-ups.
+ * - **Print mode** (default): Uses `vibe -p PROMPT --output streaming`
+ *   One-shot execution with stdin ignored (-p implies auto-approve).
+ *   Process exits after completion. Uses native `--resume SESSION_ID` for follow-ups.
  *
  * - **Interactive mode**: Uses `vibe-acp` with JSON-RPC protocol via VibeProtocolPeer
  *   Bidirectional communication for approval flows.
@@ -105,12 +105,12 @@ export class VibeConnector extends AbstractConnector {
     const { workDir, prompt, env, startupTimeout } = options;
 
     // Only use interactive mode (vibe-acp) when manual approval is needed.
-    // Print mode (vibe -p --auto-approve) handles everything else, including auto-approve mode.
+    // Print mode (vibe -p) handles everything else (-p implies auto-approve).
     if (this.needsInteractiveMode(options)) {
       return this.spawnInteractive(options);
     }
 
-    // Print mode: vibe -p PROMPT --output streaming --auto-approve
+    // Print mode: vibe -p PROMPT --output streaming
     const command = this.vibeConfig.command || 'vibe';
     const args = this.buildArgs(options);
 
@@ -123,6 +123,7 @@ export class VibeConnector extends AbstractConnector {
       args,
       env: this.mergeEnv(env),
       startupTimeout,
+      sandbox: this.vibeConfig.sandbox,
       // Print mode: stdin ignored, no interactive protocol
     });
 
@@ -152,6 +153,7 @@ export class VibeConnector extends AbstractConnector {
       env: this.mergeEnv(env),
       sessionId,
       startupTimeout,
+      sandbox: this.vibeConfig.sandbox,
     });
 
     // Pass prompt so wrapSpawnedProcess can filter replayed history from --resume
@@ -161,7 +163,7 @@ export class VibeConnector extends AbstractConnector {
   /**
    * Determine if interactive mode (vibe-acp with JSON-RPC) is needed.
    * Interactive mode is only needed when manual approval flow is required.
-   * Print mode (vibe -p --auto-approve) handles auto-approve and all other cases.
+   * Print mode (vibe -p) handles auto-approve and all other cases.
    */
   private needsInteractiveMode(options: SpawnOptions): boolean {
     const enableApprovals = options.enableApprovals ?? this.vibeConfig.enableApprovals ?? false;
@@ -209,7 +211,7 @@ For more information, visit: https://github.com/mistralai/mistral-vibe
   /**
    * Build command arguments for print mode
    *
-   * Print mode: vibe -p PROMPT --output streaming --auto-approve [--resume SESSION_ID]
+   * Print mode: vibe -p PROMPT --output streaming [--resume SESSION_ID]
    */
   private buildArgs(options: SpawnOptions, sessionId?: string): string[] {
     const args: string[] = [];
@@ -222,7 +224,7 @@ For more information, visit: https://github.com/mistralai/mistral-vibe
     }
 
     args.push('--output', 'streaming');
-    args.push('--auto-approve');
+    // Note: -p (programmatic mode) already implies auto-approve in vibe v2.x
 
     // Add session resume if provided (native --resume for follow-ups)
     if (sessionId) {
@@ -262,6 +264,7 @@ For more information, visit: https://github.com/mistralai/mistral-vibe
       vibeProtocol: true,
       vibeAutoApprove: autoApprove,
       approvalService: approvalService || new ApprovalService(),
+      sandbox: this.vibeConfig.sandbox,
     });
 
     return this.wrapSpawnedProcess(spawned, workDir, approvalService);

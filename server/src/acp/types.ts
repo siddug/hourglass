@@ -480,7 +480,17 @@ export function parseAcpLine(line: string): AcpEvent | null {
       };
     }
 
-    // Direct event format
+    // Handle Claude Code stream-json format:
+    //   {"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"..."},{"type":"tool_use",...}]}}
+    //   {"type":"tool","content":[{"type":"tool_result","tool_use_id":"...","content":"..."}]}
+    if (parsed.type === 'assistant' && parsed.message) {
+      return parseClaudeStreamJsonAssistant(parsed, timestamp);
+    }
+    if (parsed.type === 'tool' && parsed.content) {
+      return parseClaudeStreamJsonToolResult(parsed, timestamp);
+    }
+
+    // Direct event format (for types already matching AcpEventType)
     if (parsed.type) {
       return {
         ...parsed,
@@ -590,6 +600,116 @@ function parseVibeStreamingLine(
         timestamp,
       };
   }
+}
+
+/**
+ * Parse a Claude Code stream-json assistant message into ACP events.
+ *
+ * Claude Code stream-json format (--output-format stream-json --verbose):
+ *   {"type":"assistant","message":{"id":"msg_...","role":"assistant","content":[
+ *     {"type":"text","text":"Hello!"},
+ *     {"type":"thinking","thinking":"Let me think..."},
+ *     {"type":"tool_use","id":"toolu_...","name":"Read","input":{...}}
+ *   ]}}
+ *
+ * We extract the FIRST meaningful content block and return the appropriate ACP event.
+ * Multiple content blocks in a single message are handled by Claude sending multiple lines.
+ */
+function parseClaudeStreamJsonAssistant(
+  parsed: Record<string, unknown>,
+  timestamp: number
+): AcpEvent | null {
+  const message = parsed.message as Record<string, unknown> | undefined;
+  if (!message) return null;
+
+  const contentBlocks = message.content;
+  if (!Array.isArray(contentBlocks) || contentBlocks.length === 0) {
+    // Some assistant messages have string content
+    if (typeof message.content === 'string' && message.content) {
+      return {
+        type: 'message',
+        content: { type: 'text', text: message.content },
+        timestamp,
+      };
+    }
+    return null;
+  }
+
+  // Process content blocks - emit the most significant one as the ACP event
+  // Priority: tool_use > thinking > text (tool calls are most actionable)
+  let textEvent: AcpEvent | null = null;
+  let thinkingEvent: AcpEvent | null = null;
+
+  for (const block of contentBlocks) {
+    if (!block || typeof block !== 'object') continue;
+
+    switch (block.type) {
+      case 'tool_use':
+        // Tool use takes priority - return immediately
+        return {
+          type: 'toolCall',
+          toolCall: {
+            id: block.id || '',
+            name: block.name || '',
+            input: block.input || {},
+          },
+          timestamp,
+        };
+
+      case 'thinking':
+        thinkingEvent = {
+          type: 'thought',
+          content: { type: 'text', text: block.thinking || '' },
+          timestamp,
+        };
+        break;
+
+      case 'text':
+        if (block.text) {
+          textEvent = {
+            type: 'message',
+            content: { type: 'text', text: block.text },
+            timestamp,
+          };
+        }
+        break;
+    }
+  }
+
+  // Return thinking if present (since text + thinking usually means the thinking is more interesting)
+  // Otherwise return text
+  return thinkingEvent || textEvent;
+}
+
+/**
+ * Parse a Claude Code stream-json tool result into an ACP toolUpdate event.
+ *
+ * Format: {"type":"tool","content":[{"type":"tool_result","tool_use_id":"toolu_...","content":"..."}]}
+ */
+function parseClaudeStreamJsonToolResult(
+  parsed: Record<string, unknown>,
+  timestamp: number
+): AcpEvent | null {
+  const contentBlocks = parsed.content;
+  if (!Array.isArray(contentBlocks) || contentBlocks.length === 0) return null;
+
+  const block = contentBlocks[0];
+  if (!block || typeof block !== 'object') return null;
+
+  const toolUseId = block.tool_use_id || block.toolUseId || '';
+  const content = block.content;
+  const isError = block.is_error === true;
+
+  return {
+    type: 'toolUpdate',
+    update: {
+      id: toolUseId,
+      status: isError ? 'failed' : 'completed',
+      output: typeof content === 'string' ? content : JSON.stringify(content),
+      error: isError ? (typeof content === 'string' ? content : undefined) : undefined,
+    },
+    timestamp,
+  };
 }
 
 /**

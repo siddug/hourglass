@@ -280,7 +280,7 @@ export async function getGitStatus(path: string): Promise<GitStatus> {
   const info = await getGitRepoInfo(repoRoot);
 
   // Get status (porcelain for machine-readable output)
-  const statusResult = await execGit(repoRoot, ['status', '--porcelain']);
+  const statusResult = await execGit(repoRoot, ['status', '--porcelain', '-uall']);
   const changes = statusResult ? parseGitStatus(statusResult.stdout) : [];
 
   return {

@@ -325,12 +325,15 @@ export const sessionsRoutes: FastifyPluginAsync = async (server) => {
       });
     }
 
-    const { connector: connectorName, workDir: rawWorkDir, prompt, env, enableApprovals, approvalMode: requestedApprovalMode, agentMode: requestedAgentMode, sessionName, startImmediately, personalityId, projectId } = body.data;
+    const { connector: connectorName, workDir: rawWorkDir, prompt, env, enableApprovals: requestedEnableApprovals, approvalMode: requestedApprovalMode, agentMode: requestedAgentMode, sessionName, startImmediately, personalityId, projectId } = body.data;
     const workDir = expandTilde(rawWorkDir);
     // Default to 'manual' mode, but if approvalMode is provided, use it
     const approvalMode: ApprovalMode = requestedApprovalMode ?? 'manual';
     // Default to 'default' agent mode, but if agentMode is provided, use it
     const agentMode: AgentMode = requestedAgentMode ?? 'default';
+    // Derive enableApprovals from approvalMode if not explicitly provided.
+    // 'manual' mode requires the interactive control protocol for permission prompts.
+    const enableApprovals = requestedEnableApprovals ?? (approvalMode === 'manual');
 
     // Resolve personality and project for prompt context
     const promptContext = resolvePromptContext(db, personalityId, projectId);

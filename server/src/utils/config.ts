@@ -34,6 +34,18 @@ const configSchema = z.object({
         .default({}),
     })
     .default({}),
+  sandbox: z
+    .object({
+      /** Enable macOS sandbox for spawned agent processes (default: false — experimental, can block agent filesystem access) */
+      enabled: z.boolean().default(false),
+      /** Allow network access from sandboxed agents (default: true) */
+      allowNetwork: z.boolean().default(true),
+      /** Additional read-only paths to grant */
+      additionalReadPaths: z.array(z.string()).default([]),
+      /** Additional read-write paths to grant */
+      additionalWritePaths: z.array(z.string()).default([]),
+    })
+    .default({}),
   logging: z
     .object({
       level: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),

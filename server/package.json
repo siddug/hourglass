@@ -22,7 +22,7 @@
     "build": "tsup && mkdir -p dist/bin/migrations dist/migrations && cp -r src/db/migrations/* dist/bin/migrations/ && cp -r src/db/migrations/* dist/migrations/",
     "dev": "tsup --watch",
     "start": "node dist/bin/server.js",
-    "start:dev": "tsx src/bin/server.ts",
+    "start:dev": "node --env-file=.env.development --import tsx src/bin/server.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "test": "vitest run",

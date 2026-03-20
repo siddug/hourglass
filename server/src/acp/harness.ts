@@ -8,6 +8,7 @@ import { ProtocolPeer } from './protocol-peer.js';
 import { VibeProtocolPeer, type ConversationMessage } from './vibe-protocol-peer.js';
 import { ApprovalService } from './approval-service.js';
 import type { PermissionMode, ApprovalRequest, ImageData } from './control-protocol.js';
+import { isSandboxSupported, wrapWithSandbox, type SandboxConfig } from '../sandbox/index.js';
 
 /**
  * Events emitted by the ACP harness
@@ -66,6 +67,9 @@ export interface SpawnOptions {
 
   /** Auto-approve mode for Vibe */
   vibeAutoApprove?: boolean;
+
+  /** Sandbox configuration for macOS process isolation */
+  sandbox?: SandboxConfig;
 }
 
 /**
@@ -119,11 +123,29 @@ export class AcpHarness {
   private sessionNamespace: string;
   private model?: string;
   private mode?: string;
+  private sandboxSupported = isSandboxSupported();
 
   constructor(options: { sessionNamespace?: string; model?: string; mode?: string } = {}) {
     this.sessionNamespace = options.sessionNamespace || 'default_sessions';
     this.model = options.model;
     this.mode = options.mode;
+  }
+
+  /**
+   * Apply sandbox wrapping to a command if sandbox is enabled and supported.
+   * Returns the (possibly wrapped) command, args, and a cleanup function.
+   */
+  private applySandbox(
+    command: string,
+    args: string[],
+    sandboxConfig: SandboxConfig | undefined
+  ): { command: string; args: string[]; cleanup: () => void } {
+    if (!sandboxConfig?.enabled || !this.sandboxSupported) {
+      return { command, args, cleanup: () => {} };
+    }
+    const wrapped = wrapWithSandbox(command, args, sandboxConfig);
+    console.log(`[AcpHarness] Sandbox enabled: wrapping command with sandbox-exec`);
+    return wrapped;
   }
 
   /**
@@ -159,9 +181,10 @@ export class AcpHarness {
     const events = new TypedEventEmitter<HarnessEvents>();
     let currentSessionId: string | null = sessionId || null;
 
-    // Merge environment
+    // Merge environment, stripping vars that cause nested-session detection
+    const { CLAUDECODE: _ns1, CLAUDE_CODE_ENTRYPOINT: _ns2, ...parentEnv } = process.env;
     const processEnv = {
-      ...process.env,
+      ...parentEnv,
       NODE_NO_WARNINGS: '1',
       ...env,
     };
@@ -174,6 +197,14 @@ export class AcpHarness {
       actualCommand = '/usr/bin/env';
       actualArgs = [command, ...args];
     }
+
+    // Apply sandbox wrapping if configured
+    const sandbox = this.applySandbox(actualCommand, actualArgs, {
+      ...options.sandbox,
+      workDir: cwd,
+    });
+    actualCommand = sandbox.command;
+    actualArgs = sandbox.args;
 
     // Use 'ignore' for stdin as some CLIs (like claude-code) hang when stdin is piped
     // We don't need stdin for --print mode anyway
@@ -198,6 +229,7 @@ export class AcpHarness {
       new Promise<void>((resolve) => setTimeout(resolve, 100)),
       spawnErrorPromise,
     ]).catch((error) => {
+      sandbox.cleanup();
       throw new Error(`Failed to spawn process: ${error.message}`);
     });
 
@@ -241,6 +273,7 @@ export class AcpHarness {
     const exitDeferred = createDeferred<{ code: number | null; signal: NodeJS.Signals | null }>();
 
     child.on('exit', (code, signal) => {
+      sandbox.cleanup();
       msgStore.pushFinished();
       events.emit('exit', code, signal);
       exitDeferred.resolve({ code, signal });
@@ -389,9 +422,10 @@ export class AcpHarness {
     const events = new TypedEventEmitter<HarnessEvents>();
     let currentSessionId: string | null = sessionId || null;
 
-    // Merge environment
+    // Merge environment, stripping vars that cause nested-session detection
+    const { CLAUDECODE: _ns3, CLAUDE_CODE_ENTRYPOINT: _ns4, ...parentEnvI } = process.env;
     const processEnv = {
-      ...process.env,
+      ...parentEnvI,
       NODE_NO_WARNINGS: '1',
       ...env,
     };
@@ -403,6 +437,14 @@ export class AcpHarness {
       actualCommand = '/usr/bin/env';
       actualArgs = [command, ...args];
     }
+
+    // Apply sandbox wrapping if configured
+    const sandbox = this.applySandbox(actualCommand, actualArgs, {
+      ...options.sandbox,
+      workDir: cwd,
+    });
+    actualCommand = sandbox.command;
+    actualArgs = sandbox.args;
 
     // Use piped stdin for interactive mode
     const child = spawn(actualCommand, actualArgs, {
@@ -425,6 +467,7 @@ export class AcpHarness {
       new Promise<void>((resolve) => setTimeout(resolve, 100)),
       spawnErrorPromise,
     ]).catch((error) => {
+      sandbox.cleanup();
       throw new Error(`Failed to spawn process: ${error.message}`);
     });
 
@@ -467,6 +510,7 @@ export class AcpHarness {
     const exitDeferred = createDeferred<{ code: number | null; signal: NodeJS.Signals | null }>();
 
     child.on('exit', (code, signal) => {
+      sandbox.cleanup();
       msgStore.pushFinished();
       approvalService.cancelAll('Process exited');
       events.emit('exit', code, signal);
@@ -670,9 +714,10 @@ export class AcpHarness {
       msgStore.pushStderr(`Error: ${error.message}`);
     });
 
-    // Merge environment
+    // Merge environment, stripping vars that cause nested-session detection
+    const { CLAUDECODE: _ns5, CLAUDE_CODE_ENTRYPOINT: _ns6, ...parentEnvV } = process.env;
     const processEnv = {
-      ...process.env,
+      ...parentEnvV,
       ...env,
     };
 
@@ -683,6 +728,14 @@ export class AcpHarness {
       actualCommand = '/usr/bin/env';
       actualArgs = [command, ...args];
     }
+
+    // Apply sandbox wrapping if configured
+    const sandbox = this.applySandbox(actualCommand, actualArgs, {
+      ...options.sandbox,
+      workDir: cwd,
+    });
+    actualCommand = sandbox.command;
+    actualArgs = sandbox.args;
 
     const child = spawn(actualCommand, actualArgs, {
       cwd,
@@ -707,6 +760,7 @@ export class AcpHarness {
       new Promise<void>((resolve) => setTimeout(resolve, 100)),
       spawnErrorPromise,
     ]).catch((error) => {
+      sandbox.cleanup();
       throw new Error(`Failed to spawn process: ${error.message}`);
     });
 
@@ -766,6 +820,7 @@ export class AcpHarness {
     });
 
     child.on('exit', (code, signal) => {
+      sandbox.cleanup();
       console.log('[AcpHarness:vibe] Process exited, code:', code, 'signal:', signal);
       msgStore.pushFinished();
       approvalService.cancelAll('Process exited');

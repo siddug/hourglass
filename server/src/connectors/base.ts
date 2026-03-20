@@ -4,6 +4,7 @@ import type { MsgStore } from '../streaming/msg-store.js';
 import type { TypedEventEmitter } from '../streaming/event-emitter.js';
 import type { ApprovalService, ApprovalServiceMode } from '../acp/approval-service.js';
 import type { ApprovalRequest, ImageData } from '../acp/control-protocol.js';
+import type { SandboxConfig } from '../sandbox/index.js';
 
 // Re-export ImageData for convenience
 export type { ImageData } from '../acp/control-protocol.js';
@@ -56,6 +57,9 @@ export interface ConnectorConfig {
 
   /** Mode to use (if applicable) */
   mode?: string;
+
+  /** Sandbox configuration for macOS process isolation */
+  sandbox?: SandboxConfig;
 }
 
 /** Agent mode type - controls agent behavior */
