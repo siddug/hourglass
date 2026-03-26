@@ -53,6 +53,8 @@ export const projects = sqliteTable(
     projectSlug: text('project_slug').notNull().unique(),
     // Absolute path to the workspace folder on disk
     workspacePath: text('workspace_path').notNull(),
+    // Emoji icon for project (auto-generated via LLM or default)
+    icon: text('icon'),
     status: text('status').$type<ProjectStatus>().notNull().default('active'),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),

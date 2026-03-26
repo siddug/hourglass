@@ -6,49 +6,140 @@
 
 :root {
   /* Fonts */
-  --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono: 'Fira Code', ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --font-label: 'Space Grotesk', var(--font-sans);
 
   /* Light theme (default) */
-  --background: #ffffff;
-  --foreground: #171717;
-  --sidebar-bg: #f9fafb;
-  --sidebar-border: #e5e7eb;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #e2e8f0;
   --card-bg: #ffffff;
-  --card-border: #e5e7eb;
+  --card-border: #e2e8f0;
   --input-bg: #ffffff;
-  --input-border: #d1d5db;
+  --input-border: #cbd5e1;
 
   /* Status colors */
-  --status-running: #3b82f6;
-  --status-completed: #22c55e;
-  --status-failed: #ef4444;
-  --status-waiting: #06b6d4;
-  --status-killed: #6b7280;
+  --status-running: #0284c7;
+  --status-completed: #16a34a;
+  --status-failed: #dc2626;
+  --status-waiting: #0891b2;
+  --status-killed: #64748b;
+
+  /* Hourglass design tokens (light) */
+  --hg-bg: #f8fafc;
+  --hg-surface-dim: #f1f5f9;
+  --hg-header-bg: #ffffff;
+  --hg-primary: #0284c7;
+  --hg-primary-container: #e0f2fe;
+  --hg-secondary: #475569;
+  --hg-tertiary: #7c3aed;
+  --hg-tertiary-container: #ede9fe;
+  --hg-error: #dc2626;
+  --hg-surface-container: #f1f5f9;
+  --hg-surface-container-high: #e2e8f0;
+  --hg-surface-container-low: #ffffff;
+  --hg-surface-variant: #e2e8f0;
+  --hg-outline-variant: #cbd5e1;
+  --hg-on-surface: #0f172a;
+  --hg-on-surface-variant: #64748b;
+  --hg-sidebar-bg: #ffffff;
 }
 
 [data-theme="dark"] {
-  --background: #111827;
-  --foreground: #f3f4f6;
-  --sidebar-bg: #1f2937;
-  --sidebar-border: #374151;
-  --card-bg: #1f2937;
-  --card-border: #374151;
-  --input-bg: #1f2937;
-  --input-border: #4b5563;
+  --background: #0b1120;
+  --foreground: #e2e8f0;
+  --sidebar-bg: #0f1729;
+  --sidebar-border: #1e293b;
+  --card-bg: #131c2e;
+  --card-border: #1e293b;
+  --input-bg: #0f1729;
+  --input-border: #1e293b;
+
+  /* Hourglass design tokens (dark) */
+  --hg-bg: #0b1120;
+  --hg-surface-dim: #0f1729;
+  --hg-header-bg: #0b1120;
+  --hg-primary: #38bdf8;
+  --hg-primary-container: #0c4a6e;
+  --hg-secondary: #94a3b8;
+  --hg-tertiary: #a78bfa;
+  --hg-tertiary-container: #4c1d95;
+  --hg-error: #f87171;
+  --hg-surface-container: #131c2e;
+  --hg-surface-container-high: #1e293b;
+  --hg-surface-container-low: #0f1729;
+  --hg-surface-variant: #1e293b;
+  --hg-outline-variant: #1e293b;
+  --hg-on-surface: #e2e8f0;
+  --hg-on-surface-variant: #94a3b8;
+  --hg-sidebar-bg: #0f1729;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-hg-bg: var(--hg-bg);
+  --color-hg-surface-dim: var(--hg-surface-dim);
+  --color-hg-header-bg: var(--hg-header-bg);
+  --color-hg-primary: var(--hg-primary);
+  --color-hg-primary-container: var(--hg-primary-container);
+  --color-hg-secondary: var(--hg-secondary);
+  --color-hg-tertiary: var(--hg-tertiary);
+  --color-hg-tertiary-container: var(--hg-tertiary-container);
+  --color-hg-error: var(--hg-error);
+  --color-hg-surface-container: var(--hg-surface-container);
+  --color-hg-surface-container-high: var(--hg-surface-container-high);
+  --color-hg-surface-container-low: var(--hg-surface-container-low);
+  --color-hg-surface-variant: var(--hg-surface-variant);
+  --color-hg-outline-variant: var(--hg-outline-variant);
+  --color-hg-on-surface: var(--hg-on-surface);
+  --color-hg-on-surface-variant: var(--hg-on-surface-variant);
+  --color-hg-sidebar-bg: var(--hg-sidebar-bg);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
+  --font-label: var(--font-label);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+/* Label typography utility */
+.font-label {
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+
+/* Glass panel effect */
+.glass-panel {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--hg-outline-variant);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--hg-on-surface-variant);
 }
 
 /* Slow pulse animation for approval requests */

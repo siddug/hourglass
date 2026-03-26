@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" fill="none">
+  <!-- Mistral AI icon - colored pixel blocks -->
+  <rect x="10" y="10" width="40" height="40" fill="#F7D046"/>
+  <rect x="130" y="10" width="40" height="40" fill="#F7D046"/>
+  <rect x="10" y="50" width="80" height="30" fill="#F2A73B"/>
+  <rect x="90" y="50" width="80" height="30" fill="#F2A73B"/>
+  <rect x="10" y="80" width="160" height="30" fill="#EE792F"/>
+  <rect x="10" y="110" width="40" height="30" fill="#EB5829"/>
+  <rect x="70" y="110" width="40" height="30" fill="#EB5829"/>
+  <rect x="130" y="110" width="40" height="30" fill="#EB5829"/>
+  <rect x="10" y="140" width="80" height="30" fill="#EA3326"/>
+  <rect x="90" y="140" width="80" height="30" fill="#EA3326"/>
+</svg>

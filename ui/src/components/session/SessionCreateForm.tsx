@@ -21,9 +21,8 @@ import {
   type Project,
 } from '@/lib/api';
 import { WorkDirSelector } from '@/components/chat/WorkDirSelector';
-import { ConnectorSelector } from '@/components/chat/ConnectorSelector';
 import { ChatInput } from '@/components/chat/ChatInput';
-import { Button, Input, Spinner, Dialog, Dropdown } from '@/components/ui';
+import { Button, Input, Spinner, Dialog, Dropdown, AILogo } from '@/components/ui';
 import { useServer } from '@/contexts/ServerContext';
 import { parseConfigString } from '@/lib/servers';
 
@@ -71,7 +70,7 @@ export function SessionCreateForm({
   // Scheduling state
   const [showScheduleOptions, setShowScheduleOptions] = useState(false);
   const [scheduleType, setScheduleType] = useState<ScheduleType>('cron');
-  const [cronExpression, setCronExpression] = useState('0 9 * * *'); // Default: 9 AM daily
+  const [cronExpression, setCronExpression] = useState('0 9 * * *');
   const [runAt, setRunAt] = useState('');
   const [timezone, setTimezone] = useState('UTC');
   const [inheritContext, setInheritContext] = useState(false);
@@ -99,26 +98,23 @@ export function SessionCreateForm({
   const [skillsDirectory, setSkillsDirectory] = useState('');
   const [globalSkillsDir, setGlobalSkillsDir] = useState<string | null>(null);
 
-  // Common cron presets
   const cronPresets = [
     { label: 'Every minute', value: '* * * * *' },
     { label: 'Every hour', value: '0 * * * *' },
-    { label: 'Every day at 9 AM', value: '0 9 * * *' },
-    { label: 'Every day at midnight', value: '0 0 * * *' },
-    { label: 'Weekdays at 9 AM', value: '0 9 * * 1-5' },
-    { label: 'Every Sunday', value: '0 0 * * 0' },
-    { label: 'First of month', value: '0 0 1 * *' },
+    { label: 'Daily 9 AM', value: '0 9 * * *' },
+    { label: 'Midnight', value: '0 0 * * *' },
+    { label: 'Weekdays 9 AM', value: '0 9 * * 1-5' },
+    { label: 'Weekly', value: '0 0 * * 0' },
+    { label: 'Monthly', value: '0 0 1 * *' },
   ];
 
   const handleValidateServer = async () => {
     setServerError(null);
     setValidated(null);
-
     if (!configString.trim()) {
       setServerError('Please paste a config string');
       return;
     }
-
     try {
       const parsed = parseConfigString(configString.trim());
       setValidating(true);
@@ -149,7 +145,6 @@ export function SessionCreateForm({
       setError(null);
       const connectorsRes = await getConnectors();
       setConnectors(connectorsRes.connectors);
-      // Set default connector
       const available = connectorsRes.connectors.filter((c) => c.status === 'available');
       if (available.length > 0 && !connector) {
         const claude = available.find((c) => c.name === 'claude');
@@ -170,7 +165,7 @@ export function SessionCreateForm({
         setSkillsDirectory(config.globalDirectory);
       }
     } catch {
-      // Ignore - skills config is optional
+      // Skills config is optional
     }
   }, []);
 
@@ -183,7 +178,7 @@ export function SessionCreateForm({
       setPersonalities(personalitiesRes.personalities);
       setProjects(projectsRes.projects);
     } catch {
-      // Non-critical - personalities/projects are optional
+      // Non-critical
     }
   }, []);
 
@@ -246,11 +241,8 @@ export function SessionCreateForm({
       setError('Please fill in all fields');
       return;
     }
-
     setSubmitting(true);
-    if (!startImmediately) {
-      setSubmittingToTriage(true);
-    }
+    if (!startImmediately) setSubmittingToTriage(true);
     setError(null);
 
     try {
@@ -267,7 +259,6 @@ export function SessionCreateForm({
         personalityId: personalityId || undefined,
         projectId: projectId || undefined,
       });
-      // Reset form state before calling callback to ensure clean dismissal
       setSubmitting(false);
       setSubmittingToTriage(false);
       onSessionCreated?.(session.id, startImmediately);
@@ -283,17 +274,14 @@ export function SessionCreateForm({
       setError('Please fill in all fields');
       return;
     }
-
     if (scheduleType === 'cron' && !cronExpression) {
       setError('Please enter a cron expression');
       return;
     }
-
     if (scheduleType === 'once' && !runAt) {
       setError('Please select a date and time');
       return;
     }
-
     setSubmittingSchedule(true);
     setError(null);
 
@@ -312,7 +300,6 @@ export function SessionCreateForm({
         personalityId: personalityId || undefined,
         projectId: projectId || undefined,
       });
-      // Reset form state
       setSubmittingSchedule(false);
       setShowScheduleOptions(false);
       onScheduledTaskCreated?.();
@@ -322,55 +309,49 @@ export function SessionCreateForm({
     }
   };
 
+  // Loading state
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center py-8">
-        <Spinner className="h-8 w-8 text-blue-600" />
+      <div className="flex-1 flex items-center justify-center py-16">
+        <Spinner className="h-8 w-8 text-hg-primary" />
       </div>
     );
   }
 
-  // No servers configured — show add server form instead of session form
+  // No server state
   if (servers.length === 0) {
     return (
-      <div className="space-y-6 p-4">
+      <div className="max-w-lg mx-auto space-y-6 p-6">
         <div className="text-center space-y-2">
-          <h2 className="text-xl font-semibold">No Server Connected</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Add a hourglass server to get started with creating sessions.
+          <h2 className="text-xl font-semibold text-hg-on-surface">No Server Connected</h2>
+          <p className="text-sm text-hg-on-surface-variant">
+            Add a hourglass server to get started.
           </p>
         </div>
 
-        <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4">
+        <div className="rounded-xl border border-hg-outline-variant/30 bg-hg-surface-container-low p-5 space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Connection Config</label>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-              Paste the connection config string from your hourglass server terminal output.
-            </p>
+            <label className="font-label text-hg-on-surface-variant mb-2 block">Connection Config</label>
             <Input
               value={configString}
-              onChange={(e) => {
-                setConfigString(e.target.value);
-                setValidated(null);
-                setServerError(null);
-              }}
+              onChange={(e) => { setConfigString(e.target.value); setValidated(null); setServerError(null); }}
               placeholder="vibe://eyJuYW1lIjoi..."
               className="font-mono text-sm"
             />
           </div>
 
           {serverError && (
-            <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded">
+            <div className="text-sm text-hg-error bg-hg-error/10 px-3 py-2 rounded-lg">
               {serverError}
             </div>
           )}
 
           {validated && (
-            <div className="text-sm bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded border border-green-200 dark:border-green-800">
-              <div className="font-medium text-green-700 dark:text-green-300">Server reachable</div>
-              <div className="text-green-600 dark:text-green-400 mt-1">
+            <div className="text-sm bg-emerald-500/10 px-3 py-2 rounded-lg border border-emerald-500/20">
+              <div className="font-medium text-emerald-600 dark:text-emerald-400">Server reachable</div>
+              <div className="text-hg-on-surface-variant mt-1">
                 <span className="font-medium">{validated.name}</span>
-                <span className="text-gray-500 ml-2">{validated.url}</span>
+                <span className="ml-2 opacity-60">{validated.url}</span>
               </div>
             </div>
           )}
@@ -381,422 +362,426 @@ export function SessionCreateForm({
                 {validating ? 'Validating...' : 'Validate'}
               </Button>
             ) : (
-              <Button onClick={handleAddServer}>
-                Add & Connect
-              </Button>
+              <Button onClick={handleAddServer}>Add & Connect</Button>
             )}
           </div>
-        </div>
-
-        <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
-          <h3 className="text-sm font-medium">How to get the connection config</h3>
-          <ol className="text-xs text-gray-500 dark:text-gray-400 space-y-2 list-decimal list-inside">
-            <li>
-              Clone and set up the <code className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300">hourglass server</code> repository
-            </li>
-            <li>
-              Install dependencies with <code className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300">npm install</code>
-            </li>
-            <li>
-              Start the server with <code className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300">npm run dev</code>
-            </li>
-            <li>
-              Copy the <code className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300">vibe://...</code> connection string printed in the terminal
-            </li>
-          </ol>
         </div>
       </div>
     );
   }
 
+  const availableConnectors = connectors.filter((c) => c.status === 'available');
+
+  // Main form — bento grid layout
   return (
-    <div className="space-y-6 p-4">
+    <div className="p-6 space-y-6">
+      {/* Page Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-hg-on-surface">Initialize Session</h1>
+          <p className="text-sm text-hg-on-surface-variant font-mono mt-1">
+            workspace: {workDir}
+          </p>
+        </div>
+        {showCancelButton && (
+          <Button variant="ghost" onClick={onCancel} disabled={submitting || submittingSchedule}>
+            Cancel
+          </Button>
+        )}
+      </div>
+
       {/* Error Display */}
       {error && (
-        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm">
+        <div className="p-3 bg-hg-error/10 border border-hg-error/20 rounded-xl text-hg-error text-sm">
           {error}
         </div>
       )}
 
-      {/* Configuration Section */}
-      <div className="space-y-4">
-        {/* Working Directory */}
-        <div>
-          <label className="block text-sm font-medium mb-2">Working Directory</label>
-          <WorkDirSelector value={workDir} onChange={setWorkDir} />
-        </div>
-
-        {/* Connector */}
-        <ConnectorSelector
-          connectors={connectors}
-          value={connector}
-          onChange={setConnector}
-        />
-
-        {/* Approval Mode Selector */}
-        <div>
-          <label className="block text-sm font-medium mb-2">Approval Mode</label>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setApprovalMode('manual')}
-              className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors cursor-pointer ${
-                approvalMode === 'manual'
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-              }`}
-            >
-              <div className="font-medium">Manual</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                Approve each tool call
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setApprovalMode('auto')}
-              className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors cursor-pointer ${
-                approvalMode === 'auto'
-                  ? 'border-green-500 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-              }`}
-            >
-              <div className="font-medium">Auto Approve</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                Approve all automatically
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* Agent Mode Selector */}
-        <div>
-          <label className="block text-sm font-medium mb-2">Agent Mode</label>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setAgentMode('default')}
-              className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors cursor-pointer ${
-                agentMode === 'default'
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-              }`}
-            >
-              <div className="font-medium">Default</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                Full agent capabilities
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setAgentMode('plan')}
-              className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors cursor-pointer ${
-                agentMode === 'plan'
-                  ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-              }`}
-            >
-              <div className="font-medium">Plan</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                Read-only analysis mode
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* Personality & Project Selectors */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Personality</label>
-            <div className="flex gap-2">
-              <Dropdown
-                value={personalityId}
-                onChange={setPersonalityId}
-                options={[
-                  { value: '', label: 'None' },
-                  ...personalities.map((p) => ({ value: p.id, label: `${p.name} (${p.readableId})` })),
-                ]}
-                placeholder="Select personality..."
-                className="flex-1"
-              />
-              <button
-                type="button"
-                onClick={() => setShowNewPersonality(true)}
-                className="px-2 py-1 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors whitespace-nowrap"
-              >
-                + New
-              </button>
+      {/* Bento Grid: Left (prompt + config) | Right (execution params) */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
+        {/* ===== LEFT COLUMN ===== */}
+        <div className="space-y-5">
+          {/* Primary Directive Card */}
+          <div className="rounded-xl border border-hg-outline-variant/30 bg-hg-surface-container-low p-5">
+            <div className="flex items-center justify-between mb-3">
+              <span className="font-label text-hg-on-surface-variant">Primary Directive</span>
+              <span className="flex items-center gap-1.5 text-[10px] text-emerald-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Ready for input
+              </span>
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">Project</label>
-            <div className="flex gap-2">
-              <Dropdown
-                value={projectId}
-                onChange={setProjectId}
-                options={[
-                  { value: '', label: 'None' },
-                  ...projects.map((p) => ({ value: p.id, label: p.name })),
-                ]}
-                placeholder="Select project..."
-                className="flex-1"
-              />
-              <button
-                type="button"
-                onClick={() => setShowNewProject(true)}
-                className="px-2 py-1 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors whitespace-nowrap"
-              >
-                + New
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Advanced Options Toggle */}
-        <div className="pt-2">
-          <button
-            type="button"
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1"
-          >
-            <svg
-              className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-90' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            Advanced Options
-          </button>
-
-          {showAdvanced && (
-            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 space-y-3">
-              {/* Skills Directory */}
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Skills Directory
-                  {globalSkillsDir && (
-                    <span className="ml-2 text-xs font-normal text-gray-500">(from global settings)</span>
-                  )}
-                </label>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                  Override the global skills directory for this session. Leave empty to skip skill injection.
-                </p>
-                <WorkDirSelector value={skillsDirectory} onChange={setSkillsDirectory} />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Chat Input */}
-      <div>
-        <label className="block text-sm font-medium mb-2">Task</label>
-        <ChatInput
-          value={prompt}
-          onChange={setPrompt}
-          onSubmit={() => handleSubmit(true)}
-          disabled={!connector || connectors.filter(c => c.status === 'available').length === 0}
-          submitting={submitting || submittingSchedule}
-          images={images}
-          onImagesChange={setImages}
-          placeholder="What would you like the agent to do? (Enter to send, Shift+Enter for new line)"
-        />
-      </div>
-
-      {/* Schedule Options (shown when Schedule button is clicked) */}
-      {showScheduleOptions && (
-        <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <h3 className="font-medium text-gray-900 dark:text-gray-100">Schedule Options</h3>
-            <button
-              type="button"
-              onClick={() => setShowScheduleOptions(false)}
-              className="text-gray-400 hover:text-gray-500"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <ChatInput
+              value={prompt}
+              onChange={setPrompt}
+              onSubmit={() => handleSubmit(true)}
+              disabled={!connector || availableConnectors.length === 0}
+              submitting={submitting || submittingSchedule}
+              images={images}
+              onImagesChange={setImages}
+              placeholder="What are we building today? Describe the objective, edge cases, and constraints..."
+            />
           </div>
 
-          {/* Schedule Type */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Schedule Type
-            </label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="scheduleType"
-                  value="cron"
-                  checked={scheduleType === 'cron'}
-                  onChange={() => setScheduleType('cron')}
-                  className="text-blue-600"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Recurring (cron)</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="scheduleType"
-                  value="once"
-                  checked={scheduleType === 'once'}
-                  onChange={() => setScheduleType('once')}
-                  className="text-blue-600"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">One-time</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Cron Expression or DateTime */}
-          {scheduleType === 'cron' ? (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Cron Expression
-              </label>
-              <Input
-                value={cronExpression}
-                onChange={(e) => setCronExpression(e.target.value)}
-                placeholder="0 9 * * *"
-              />
-              <div className="mt-2 flex flex-wrap gap-2">
-                {cronPresets.map((preset) => (
+          {/* Bottom Row: Connector + Working Dir/Project */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Connector Card */}
+            <div className="rounded-xl border border-hg-outline-variant/30 bg-hg-surface-container-low p-5">
+              <span className="font-label text-hg-on-surface-variant mb-3 block">Preferred Agentic Connector</span>
+              <div className="space-y-2">
+                {availableConnectors.map((c) => (
                   <button
-                    key={preset.value}
+                    key={c.name}
                     type="button"
-                    onClick={() => setCronExpression(preset.value)}
-                    className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-                      cronExpression === preset.value
-                        ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900 dark:border-blue-700 dark:text-blue-300'
-                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700'
+                    onClick={() => setConnector(c.name)}
+                    className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer ${
+                      connector === c.name
+                        ? 'border-hg-primary/40 bg-hg-primary/5'
+                        : 'border-hg-outline-variant/20 hover:border-hg-outline-variant/40'
                     }`}
                   >
-                    {preset.label}
+                    <AILogo provider={c.name} className="w-6 h-6" />
+                    <div className="flex-1 text-left">
+                      <div className="text-sm font-medium text-hg-on-surface">{c.displayName}</div>
+                      {c.version && (
+                        <div className="text-[10px] text-hg-on-surface-variant">{c.version}</div>
+                      )}
+                    </div>
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                      c.status === 'available'
+                        ? 'bg-emerald-500/10 text-emerald-500'
+                        : 'bg-hg-surface-container-high text-hg-on-surface-variant'
+                    }`}>
+                      {c.status === 'available' ? 'Online' : 'Offline'}
+                    </span>
                   </button>
                 ))}
+                {availableConnectors.length === 0 && (
+                  <p className="text-xs text-hg-on-surface-variant/60 text-center py-4">
+                    No connectors available
+                  </p>
+                )}
               </div>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Format: minute hour day-of-month month day-of-week
-              </p>
             </div>
-          ) : (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Run At
-              </label>
-              <Input
-                type="datetime-local"
-                value={runAt}
-                onChange={(e) => setRunAt(e.target.value)}
-              />
-            </div>
-          )}
 
-          {/* Context Inheritance */}
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={inheritContext}
-                onChange={(e) => setInheritContext(e.target.checked)}
-                className="mt-1 text-blue-600"
-              />
+            {/* Working Directory + Project Card */}
+            <div className="rounded-xl border border-hg-outline-variant/30 bg-hg-surface-container-low p-5 space-y-4">
               <div>
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Inherit context between runs
-                </span>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Each execution will continue from the previous session's context (conversation history).
-                </p>
+                <span className="font-label text-hg-on-surface-variant mb-2 block">Working Directory</span>
+                <WorkDirSelector value={workDir} onChange={setWorkDir} />
               </div>
-            </label>
+              <div>
+                <span className="font-label text-hg-on-surface-variant mb-2 block">Project Context</span>
+                <Dropdown
+                  value={projectId}
+                  onChange={setProjectId}
+                  options={[
+                    { value: '', label: 'None' },
+                    ...projects.map((p) => ({ value: p.id, label: p.name })),
+                  ]}
+                  placeholder="Select project..."
+                  className="w-full"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewProject(true)}
+                  className="mt-1.5 text-[11px] text-hg-primary hover:text-hg-primary/80 transition-colors"
+                >
+                  + Create new project
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Create Schedule Button */}
-          <div className="pt-2">
-            <Button
-              onClick={handleScheduleSubmit}
-              disabled={!connector || !workDir || !prompt.trim() || submittingSchedule}
-              className="w-full"
-            >
-              {submittingSchedule ? <Spinner className="h-4 w-4 mr-2" /> : null}
-              Create Scheduled Task
-            </Button>
-          </div>
-        </div>
-      )}
+          {/* Schedule Options (expandable) */}
+          {showScheduleOptions && (
+            <div className="rounded-xl border border-hg-outline-variant/30 bg-hg-surface-container-low p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="font-label text-hg-on-surface-variant">Schedule Options</span>
+                <button
+                  type="button"
+                  onClick={() => setShowScheduleOptions(false)}
+                  className="text-hg-on-surface-variant hover:text-hg-on-surface cursor-pointer"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
 
-      {/* Action Buttons */}
-      {(showCancelButton || showSaveToTriageButton || showScheduleButton) && (
-        <div className="flex justify-end gap-2 pt-2">
-          {showCancelButton && (
-            <Button variant="ghost" onClick={onCancel} disabled={submitting || submittingSchedule}>
-              Cancel
-            </Button>
-          )}
-          {showScheduleButton && !showScheduleOptions && (
-            <Button
-              variant="secondary"
-              onClick={() => setShowScheduleOptions(true)}
-              disabled={!connector || !workDir || !prompt.trim() || submitting}
-            >
-              Schedule...
-            </Button>
-          )}
-          {showSaveToTriageButton && (
-            <Button
-              variant="secondary"
-              onClick={() => handleSubmit(false)}
-              disabled={!connector || !workDir || !prompt.trim() || submitting || submittingSchedule}
-            >
-              {submittingToTriage ? <Spinner className="h-4 w-4 mr-2" /> : null}
-              Save to Triage
-            </Button>
-          )}
-          {showSaveToTriageButton && (
-            <Button
-              variant="primary"
-              onClick={() => handleSubmit(true)}
-              disabled={!connector || !workDir || !prompt.trim() || submitting || submittingSchedule}
-            >
-              {submitting && !submittingToTriage ? <Spinner className="h-4 w-4 mr-2" /> : null}
-              Start Now
-            </Button>
-          )}
-        </div>
-      )}
+              {/* Schedule Type */}
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-hg-on-surface">
+                  <input
+                    type="radio"
+                    name="scheduleType"
+                    value="cron"
+                    checked={scheduleType === 'cron'}
+                    onChange={() => setScheduleType('cron')}
+                    className="accent-[var(--hg-primary)]"
+                  />
+                  Recurring (cron)
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-hg-on-surface">
+                  <input
+                    type="radio"
+                    name="scheduleType"
+                    value="once"
+                    checked={scheduleType === 'once'}
+                    onChange={() => setScheduleType('once')}
+                    className="accent-[var(--hg-primary)]"
+                  />
+                  One-time
+                </label>
+              </div>
 
-      {/* Connectors Status */}
-      {connectors.length > 0 && (
-        <div className="pt-4 border-t border-[var(--card-border)]">
-          <p className="text-xs text-gray-500 mb-2">Available Connectors:</p>
-          <div className="flex flex-wrap gap-2">
-            {connectors.map((c) => (
-              <span
-                key={c.name}
-                className={`px-2 py-1 text-xs rounded-full ${
-                  c.status === 'available'
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
-                }`}
+              {scheduleType === 'cron' ? (
+                <div>
+                  <Input
+                    value={cronExpression}
+                    onChange={(e) => setCronExpression(e.target.value)}
+                    placeholder="0 9 * * *"
+                  />
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {cronPresets.map((preset) => (
+                      <button
+                        key={preset.value}
+                        type="button"
+                        onClick={() => setCronExpression(preset.value)}
+                        className={`px-2 py-1 text-[10px] rounded-md border transition-colors cursor-pointer ${
+                          cronExpression === preset.value
+                            ? 'bg-hg-primary/10 border-hg-primary/30 text-hg-primary'
+                            : 'border-hg-outline-variant/30 text-hg-on-surface-variant hover:border-hg-outline-variant'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <Input
+                  type="datetime-local"
+                  value={runAt}
+                  onChange={(e) => setRunAt(e.target.value)}
+                />
+              )}
+
+              <label className="flex items-start gap-3 cursor-pointer border-t border-hg-outline-variant/20 pt-4">
+                <input
+                  type="checkbox"
+                  checked={inheritContext}
+                  onChange={(e) => setInheritContext(e.target.checked)}
+                  className="mt-1 accent-[var(--hg-primary)]"
+                />
+                <div>
+                  <span className="text-sm font-medium text-hg-on-surface">Inherit context between runs</span>
+                  <p className="text-[11px] text-hg-on-surface-variant mt-0.5">
+                    Each execution continues from the previous session's context.
+                  </p>
+                </div>
+              </label>
+
+              <Button
+                onClick={handleScheduleSubmit}
+                disabled={!connector || !workDir || !prompt.trim() || submittingSchedule}
+                className="w-full"
               >
-                {c.displayName}
-                {c.version && ` v${c.version}`}
-              </span>
-            ))}
+                {submittingSchedule ? <Spinner className="h-4 w-4 mr-2" /> : null}
+                Create Scheduled Task
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* ===== RIGHT COLUMN: Execution Parameters ===== */}
+        <div className="space-y-5">
+          <div className="rounded-xl border border-hg-outline-variant/30 bg-hg-surface-container-low p-5 space-y-5">
+            <h3 className="text-sm font-semibold text-hg-on-surface">Execution Parameters</h3>
+
+            {/* Personality Mask */}
+            <div>
+              <span className="font-label text-hg-on-surface-variant mb-2 block">Personality Mask</span>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPersonalityId('')}
+                  className={`px-3 py-1.5 text-xs rounded-full border transition-colors cursor-pointer ${
+                    !personalityId
+                      ? 'bg-hg-primary/10 border-hg-primary/30 text-hg-primary'
+                      : 'border-hg-outline-variant/30 text-hg-on-surface-variant hover:border-hg-outline-variant'
+                  }`}
+                >
+                  None
+                </button>
+                {personalities.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setPersonalityId(p.id)}
+                    className={`px-3 py-1.5 text-xs rounded-full border transition-colors cursor-pointer ${
+                      personalityId === p.id
+                        ? 'bg-hg-primary/10 border-hg-primary/30 text-hg-primary'
+                        : 'border-hg-outline-variant/30 text-hg-on-surface-variant hover:border-hg-outline-variant'
+                    }`}
+                  >
+                    @{p.readableId}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setShowNewPersonality(true)}
+                  className="px-3 py-1.5 text-xs rounded-full border border-dashed border-hg-outline-variant/30 text-hg-on-surface-variant hover:border-hg-primary/30 hover:text-hg-primary transition-colors cursor-pointer"
+                >
+                  + New
+                </button>
+              </div>
+            </div>
+
+            {/* Agent Mode */}
+            <div>
+              <span className="font-label text-hg-on-surface-variant mb-2 block">Agent Mode</span>
+              <p className="text-[11px] text-hg-on-surface-variant/70 mb-2">Deep multi-step analysis and planning</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAgentMode('default')}
+                  className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
+                    agentMode === 'default'
+                      ? 'border-hg-primary/40 bg-hg-primary/10 text-hg-primary'
+                      : 'border-hg-outline-variant/30 text-hg-on-surface-variant hover:border-hg-outline-variant'
+                  }`}
+                >
+                  Default
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAgentMode('plan')}
+                  className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
+                    agentMode === 'plan'
+                      ? 'border-hg-tertiary/40 bg-hg-tertiary/10 text-hg-tertiary'
+                      : 'border-hg-outline-variant/30 text-hg-on-surface-variant hover:border-hg-outline-variant'
+                  }`}
+                >
+                  Plan
+                </button>
+              </div>
+            </div>
+
+            {/* Approval Mode */}
+            <div>
+              <span className="font-label text-hg-on-surface-variant mb-2 block">Approval Mode</span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setApprovalMode('manual')}
+                  className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
+                    approvalMode === 'manual'
+                      ? 'border-hg-primary/40 bg-hg-primary/10 text-hg-primary'
+                      : 'border-hg-outline-variant/30 text-hg-on-surface-variant hover:border-hg-outline-variant'
+                  }`}
+                >
+                  Manual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setApprovalMode('auto')}
+                  className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
+                    approvalMode === 'auto'
+                      ? 'border-hg-primary/40 bg-hg-primary/10 text-hg-primary'
+                      : 'border-hg-outline-variant/30 text-hg-on-surface-variant hover:border-hg-outline-variant'
+                  }`}
+                >
+                  Auto
+                </button>
+              </div>
+            </div>
+
+            {/* Advanced Options Toggle */}
+            <div className="border-t border-hg-outline-variant/20 pt-4">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="text-[11px] text-hg-on-surface-variant hover:text-hg-on-surface flex items-center gap-1 transition-colors"
+              >
+                <svg
+                  className={`w-3 h-3 transition-transform ${showAdvanced ? 'rotate-90' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                Advanced Options
+              </button>
+
+              {showAdvanced && (
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <span className="font-label text-hg-on-surface-variant mb-1 block">
+                      Skills Directory
+                      {globalSkillsDir && (
+                        <span className="ml-1 normal-case tracking-normal font-normal opacity-60">(global)</span>
+                      )}
+                    </span>
+                    <WorkDirSelector value={skillsDirectory} onChange={setSkillsDirectory} />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Initiate Session Button */}
+            <button
+              type="button"
+              onClick={() => handleSubmit(true)}
+              disabled={!connector || !workDir || (!prompt.trim() && images.length === 0) || submitting || submittingSchedule}
+              className="w-full py-3 px-4 rounded-xl font-semibold text-sm text-white bg-hg-primary hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity cursor-pointer"
+            >
+              {submitting && !submittingToTriage ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Spinner className="h-4 w-4" />
+                  Initiating...
+                </span>
+              ) : (
+                'INITIATE SESSION'
+              )}
+            </button>
+
+            {/* Secondary actions */}
+            {(showSaveToTriageButton || showScheduleButton) && (
+              <div className="flex gap-2">
+                {showScheduleButton && !showScheduleOptions && (
+                  <button
+                    type="button"
+                    onClick={() => setShowScheduleOptions(true)}
+                    disabled={!connector || !workDir || !prompt.trim() || submitting}
+                    className="flex-1 py-2 px-3 text-xs rounded-lg border border-hg-outline-variant/30 text-hg-on-surface-variant hover:border-hg-outline-variant disabled:opacity-40 transition-colors cursor-pointer"
+                  >
+                    Schedule...
+                  </button>
+                )}
+                {showSaveToTriageButton && (
+                  <button
+                    type="button"
+                    onClick={() => handleSubmit(false)}
+                    disabled={!connector || !workDir || !prompt.trim() || submitting || submittingSchedule}
+                    className="flex-1 py-2 px-3 text-xs rounded-lg border border-hg-outline-variant/30 text-hg-on-surface-variant hover:border-hg-outline-variant disabled:opacity-40 transition-colors cursor-pointer"
+                  >
+                    {submittingToTriage ? <Spinner className="h-3 w-3 mr-1 inline" /> : null}
+                    Save to Triage
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
-      )}
+      </div>
 
       {/* New Personality Dialog */}
       <Dialog open={showNewPersonality} onClose={() => setShowNewPersonality(false)} title="Create Personality">
         <div className="p-4 space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-sm font-medium mb-1">Name</label>
+              <label className="font-label text-hg-on-surface-variant mb-1 block">Name</label>
               <Input
                 value={newPName}
                 onChange={(e) => {
@@ -809,7 +794,7 @@ export function SessionCreateForm({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">@ID</label>
+              <label className="font-label text-hg-on-surface-variant mb-1 block">@ID</label>
               <Input
                 value={newPReadableId}
                 onChange={(e) => setNewPReadableId(e.target.value)}
@@ -819,12 +804,12 @@ export function SessionCreateForm({
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Instructions</label>
+            <label className="font-label text-hg-on-surface-variant mb-1 block">Instructions</label>
             <textarea
               value={newPInstructions}
               onChange={(e) => setNewPInstructions(e.target.value)}
               placeholder="Define who this agent is, its expertise, behavior..."
-              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+              className="w-full px-3 py-2 text-sm border border-hg-outline-variant/30 rounded-lg bg-hg-surface-container text-hg-on-surface focus:ring-2 focus:ring-hg-primary/50 focus:border-hg-primary/50 min-h-[80px] outline-none"
             />
           </div>
           <div className="flex justify-end gap-2">
@@ -841,7 +826,7 @@ export function SessionCreateForm({
         <div className="p-4 space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-sm font-medium mb-1">Name</label>
+              <label className="font-label text-hg-on-surface-variant mb-1 block">Name</label>
               <Input
                 value={newPrName}
                 onChange={(e) => {
@@ -854,7 +839,7 @@ export function SessionCreateForm({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Slug</label>
+              <label className="font-label text-hg-on-surface-variant mb-1 block">Slug</label>
               <Input
                 value={newPrSlug}
                 onChange={(e) => setNewPrSlug(e.target.value)}
@@ -863,7 +848,7 @@ export function SessionCreateForm({
               />
             </div>
           </div>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-hg-on-surface-variant">
             Workspace: ~/.hourglass/projects/{newPrSlug || 'slug'}/
           </p>
           <div className="flex justify-end gap-2">

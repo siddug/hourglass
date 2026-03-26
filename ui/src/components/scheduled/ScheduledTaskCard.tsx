@@ -87,16 +87,16 @@ export function ScheduledTaskCard({ task, onClick, onToggleEnabled, onTrigger }:
     <div
       onClick={onClick}
       className={`
-        p-3 rounded-lg border bg-white dark:bg-gray-800 cursor-pointer hover:shadow-md transition-all
+        p-3 rounded-lg border bg-hg-surface-container-low cursor-pointer hover:border-hg-primary/30 hover:shadow-lg transition-all
         ${task.enabled
-          ? 'border-blue-200 dark:border-blue-800'
-          : 'border-gray-200 dark:border-gray-700 opacity-60'
+          ? 'border-hg-primary/20'
+          : 'border-hg-outline-variant/20 opacity-60'
         }
       `}
     >
       {/* Header with name and toggle */}
       <div className="flex items-start justify-between mb-2">
-        <h3 className="font-medium text-sm text-gray-900 dark:text-gray-100 line-clamp-2 flex-1">
+        <h3 className="font-medium text-sm text-hg-on-surface line-clamp-2 flex-1">
           {task.name}
         </h3>
         {onToggleEnabled && (
@@ -106,10 +106,10 @@ export function ScheduledTaskCard({ task, onClick, onToggleEnabled, onTrigger }:
               onToggleEnabled(!task.enabled);
             }}
             className={`
-              ml-2 px-2 py-0.5 text-xs font-medium rounded-full transition-colors
+              ml-2 px-2 py-0.5 text-xs font-medium rounded-full transition-colors cursor-pointer
               ${task.enabled
-                ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300'
-                : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400'
+                ? 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25'
+                : 'bg-hg-surface-container-high text-hg-on-surface-variant hover:bg-hg-outline-variant'
               }
             `}
           >
@@ -119,7 +119,7 @@ export function ScheduledTaskCard({ task, onClick, onToggleEnabled, onTrigger }:
       </div>
 
       {/* Schedule info */}
-      <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+      <div className="text-xs text-hg-on-surface-variant/70 mb-2">
         <div className="flex items-center gap-1 mb-1">
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -135,19 +135,19 @@ export function ScheduledTaskCard({ task, onClick, onToggleEnabled, onTrigger }:
       </div>
 
       {/* Stats row */}
-      <div className="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500 mb-2">
+      <div className="flex items-center justify-between text-xs text-hg-on-surface-variant/70 mb-2">
         <span>Next: {nextRunDisplay}</span>
         <span>Runs: {task.executionCount}</span>
       </div>
 
       {/* Tags */}
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1.5">
         {/* Schedule type badge */}
         <span className={`
-          inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md
+          inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full
           ${task.scheduleType === 'cron'
-            ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'
-            : 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300'
+            ? 'bg-hg-tertiary/10 text-hg-tertiary'
+            : 'bg-amber-500/10 text-amber-500'
           }
         `}>
           {task.scheduleType === 'cron' ? 'Recurring' : 'One-time'}
@@ -155,13 +155,13 @@ export function ScheduledTaskCard({ task, onClick, onToggleEnabled, onTrigger }:
 
         {/* Context inheritance badge */}
         {task.inheritContext && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-hg-primary/10 text-hg-primary">
             Chain
           </span>
         )}
 
         {/* Connector type */}
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-hg-surface-container-high text-hg-on-surface-variant">
           {task.connectorType}
         </span>
 
@@ -172,7 +172,7 @@ export function ScheduledTaskCard({ task, onClick, onToggleEnabled, onTrigger }:
               e.stopPropagation();
               onTrigger();
             }}
-            className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900 dark:text-indigo-300 dark:hover:bg-indigo-800 transition-colors"
+            className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-hg-primary/10 text-hg-primary hover:bg-hg-primary/20 transition-colors cursor-pointer"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />

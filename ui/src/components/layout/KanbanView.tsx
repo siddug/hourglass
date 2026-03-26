@@ -8,26 +8,22 @@ import {
   getSessionWorkDirs,
   type Session,
   type SessionStatus,
-  type ScheduledTask,
   type Personality,
   type Project,
 } from '@/lib/api';
 import { usePaginatedSessions } from '@/hooks/usePaginatedSessions';
-import { useScheduledTasks } from '@/hooks/useScheduledTasks';
 import { Spinner } from '@/components/ui';
 import { SessionCreateModal } from '@/components/session/SessionCreateModal';
 import { SessionDetailModal } from '@/components/session/SessionDetailModal';
-import { ScheduledTaskCard } from '@/components/scheduled/ScheduledTaskCard';
-import { ScheduledTaskDetailModal } from '@/components/scheduled/ScheduledTaskDetailModal';
 
-const COLUMNS: { status: SessionStatus; title: string; color: string; bgColor: string }[] = [
-  { status: 'triage', title: 'Todo', color: 'bg-gray-400', bgColor: 'bg-gray-50 dark:bg-gray-800/50' },
-  { status: 'in_progress', title: 'Agent WIP', color: 'bg-gray-500', bgColor: 'bg-gray-50 dark:bg-gray-800/50' },
-  { status: 'approval', title: 'Agent requires approval', color: 'bg-gray-500', bgColor: 'bg-gray-50 dark:bg-gray-800/50' },
-  { status: 'completed', title: 'Agent completed', color: 'bg-gray-500', bgColor: 'bg-gray-50 dark:bg-gray-800/50' },
-  { status: 'failed', title: 'Agent failed', color: 'bg-gray-500', bgColor: 'bg-gray-50 dark:bg-gray-800/50' },
-  { status: 'done', title: 'Done', color: 'bg-gray-500', bgColor: 'bg-gray-50 dark:bg-gray-800/50' },
-  { status: 'archived', title: 'Archive', color: 'bg-gray-400', bgColor: 'bg-gray-50 dark:bg-gray-800/50' },
+const COLUMNS: { status: SessionStatus; title: string; badgeBg: string }[] = [
+  { status: 'triage', title: 'Triage', badgeBg: 'bg-hg-surface-container-high text-hg-on-surface-variant' },
+  { status: 'in_progress', title: 'In Progress', badgeBg: 'bg-hg-primary/15 text-hg-primary' },
+  { status: 'approval', title: 'Approval', badgeBg: 'bg-amber-500/15 text-amber-500' },
+  { status: 'completed', title: 'Completed', badgeBg: 'bg-emerald-500/15 text-emerald-500' },
+  { status: 'failed', title: 'Failed', badgeBg: 'bg-hg-error/15 text-hg-error' },
+  { status: 'done', title: 'Done', badgeBg: 'bg-hg-surface-container-high text-hg-on-surface-variant' },
+  { status: 'archived', title: 'Archive', badgeBg: 'bg-hg-surface-container-high text-hg-on-surface-variant' },
 ];
 
 interface KanbanViewProps {
@@ -37,17 +33,8 @@ interface KanbanViewProps {
 
 export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewProps) {
   const { columns, loadMore, refresh, smartRefresh, moveSessionOptimistically } = usePaginatedSessions();
-  const {
-    tasks: scheduledTasks,
-    loading: scheduledTasksLoading,
-    refresh: refreshScheduledTasks,
-    enable: enableTask,
-    disable: disableTask,
-    trigger: triggerTask,
-  } = useScheduledTasks();
   const [createModalOpen, setCreateModalOpen] = useState(initialCreateOpen ?? false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(initialSessionId ?? null);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   // Personality & Project lookup maps for card display
   const [personalityMap, setPersonalityMap] = useState<Record<string, Personality>>({});
@@ -111,37 +98,6 @@ export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewPr
   const closeCreateModal = () => {
     setCreateModalOpen(false);
     window.history.pushState(null, '', '/kanban');
-  };
-
-  // Scheduled task modal handlers
-  const openScheduledTask = (taskId: string) => {
-    setSelectedTaskId(taskId);
-  };
-
-  const closeScheduledTask = () => {
-    setSelectedTaskId(null);
-  };
-
-  const handleToggleTaskEnabled = async (taskId: string, enabled: boolean) => {
-    try {
-      if (enabled) {
-        await enableTask(taskId);
-      } else {
-        await disableTask(taskId);
-      }
-    } catch (err) {
-      console.error('Failed to toggle task:', err);
-    }
-  };
-
-  const handleTriggerTask = async (taskId: string) => {
-    try {
-      await triggerTask(taskId);
-      // Also refresh sessions since a new one was created
-      refresh();
-    } catch (err) {
-      console.error('Failed to trigger task:', err);
-    }
   };
 
   // Drag state
@@ -226,9 +182,9 @@ export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewPr
   const isInitialLoading = Object.values(columns).some((col) => col.initialLoading);
 
   return (
-    <div className="flex flex-col h-full bg-[var(--bg)]">
+    <div className="flex flex-col h-full bg-hg-bg">
       {/* Kanban Sub-header with Filters */}
-      <div className="flex-shrink-0 relative px-3 py-2 bg-gray-100 dark:bg-gray-900 border-b border-[var(--card-border)]">
+      <div className="flex-shrink-0 relative px-3 py-2 bg-hg-bg border-b border-hg-outline-variant/15">
         <div className="flex items-center gap-2 md:gap-4 overflow-x-auto">
           <WorkDirSwitcher
             workDirs={workDirsList}
@@ -244,23 +200,13 @@ export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewPr
       </div>
 
       {/* Kanban Columns */}
-      <div className="flex-1 overflow-x-auto p-3 bg-gray-100 dark:bg-gray-900">
+      <div className="flex-1 overflow-x-auto p-3 bg-hg-bg">
         {isInitialLoading ? (
           <div className="flex items-center justify-center h-full">
-            <Spinner className="h-8 w-8 text-blue-600" />
+            <Spinner className="h-8 w-8 text-hg-primary" />
           </div>
         ) : (
           <div className="flex gap-3 h-full min-w-max min-h-full">
-            {/* Scheduled Tasks Column */}
-            <ScheduledTasksColumn
-              tasks={scheduledTasks}
-              loading={scheduledTasksLoading}
-              onTaskClick={openScheduledTask}
-              onToggleEnabled={handleToggleTaskEnabled}
-              onTrigger={handleTriggerTask}
-              onCreateClick={openCreateModal}
-            />
-
             {COLUMNS.map((column) => {
               const allSessions = columns[column.status]?.sessions || [];
               let filteredSessions = allSessions;
@@ -275,8 +221,7 @@ export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewPr
                   key={column.status}
                   status={column.status}
                   title={column.title}
-                  color={column.color}
-                  bgColor={column.bgColor}
+                  badgeBg={column.badgeBg}
                   sessions={filteredSessions}
                   hasMore={columns[column.status]?.hasMore}
                   loading={columns[column.status]?.loading}
@@ -305,7 +250,6 @@ export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewPr
         open={createModalOpen}
         onClose={closeCreateModal}
         onCreated={refresh}
-        onScheduledTaskCreated={refreshScheduledTasks}
         initialWorkDir={workDirFilter}
       />
 
@@ -318,15 +262,6 @@ export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewPr
         />
       )}
 
-      {/* Scheduled Task Detail Modal */}
-      {selectedTaskId && (
-        <ScheduledTaskDetailModal
-          taskId={selectedTaskId}
-          open={!!selectedTaskId}
-          onClose={closeScheduledTask}
-          onUpdated={refreshScheduledTasks}
-        />
-      )}
     </div>
   );
 }
@@ -335,8 +270,7 @@ export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewPr
 interface KanbanColumnProps {
   status: SessionStatus;
   title: string;
-  color: string;
-  bgColor: string;
+  badgeBg: string;
   sessions: Session[];
   hasMore: boolean;
   loading: boolean;
@@ -358,8 +292,7 @@ interface KanbanColumnProps {
 function KanbanColumn({
   status,
   title,
-  color,
-  bgColor,
+  badgeBg,
   sessions = [],
   hasMore,
   loading,
@@ -399,8 +332,8 @@ function KanbanColumn({
 
   return (
     <div
-      className={`flex flex-col w-72 h-full ${bgColor} rounded-lg ${
-        isDragOver ? 'ring-2 ring-blue-400' : ''
+      className={`flex flex-col w-72 h-full ${
+        isDragOver ? 'bg-hg-primary/5 rounded-lg' : ''
       }`}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
@@ -409,9 +342,8 @@ function KanbanColumn({
       {/* Column Header */}
       <div className="flex items-center justify-between px-3 py-2.5">
         <div className="flex items-center gap-2">
-          <div className={`w-1 h-4 rounded-full ${color}`} />
-          <h2 className="font-medium text-sm text-gray-700 dark:text-gray-200">{title}</h2>
-          <span className="text-sm text-gray-400">
+          <h2 className="text-xs font-medium text-hg-on-surface-variant tracking-wide">{title}</h2>
+          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${badgeBg}`}>
             {sessions?.length}{hasMore ? '+' : ''}
           </span>
         </div>
@@ -421,7 +353,7 @@ function KanbanColumn({
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer"
+                className="text-hg-on-surface-variant hover:text-hg-on-surface transition-colors p-1 rounded hover:bg-hg-surface-container-high cursor-pointer"
                 title="Bulk actions"
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -431,13 +363,13 @@ function KanbanColumn({
                 </svg>
               </button>
               {menuOpen && (
-                <div className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 py-1">
+                <div className="absolute right-0 top-full mt-1 w-44 bg-hg-surface-container rounded-lg shadow-xl border border-hg-outline-variant/30 z-50 py-1">
                   <button
                     onClick={() => {
                       onBulkMove(status, 'done');
                       setMenuOpen(false);
                     }}
-                    className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 cursor-pointer"
+                    className="w-full text-left px-3 py-2 text-sm text-hg-on-surface hover:bg-hg-surface-container-high flex items-center gap-2 cursor-pointer"
                   >
                     <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -449,9 +381,9 @@ function KanbanColumn({
                       onBulkMove(status, 'archived');
                       setMenuOpen(false);
                     }}
-                    className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 cursor-pointer"
+                    className="w-full text-left px-3 py-2 text-sm text-hg-on-surface hover:bg-hg-surface-container-high flex items-center gap-2 cursor-pointer"
                   >
-                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-hg-on-surface-variant" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                     </svg>
                     Move all to Archive
@@ -462,7 +394,7 @@ function KanbanColumn({
           )}
           <button
             onClick={onCreateClick}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors cursor-pointer"
+            className="text-hg-on-surface-variant hover:text-hg-on-surface transition-colors cursor-pointer"
             title="Add new session"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -487,7 +419,7 @@ function KanbanColumn({
           />
         ))}
         {sessions.length === 0 && !loading && (
-          <div className="text-center text-gray-400 text-sm py-8">
+          <div className="text-center text-hg-on-surface-variant text-sm py-8">
             No sessions
           </div>
         )}
@@ -500,13 +432,13 @@ function KanbanColumn({
         {/* Loading indicator */}
         {loading && (
           <div className="flex justify-center py-2">
-            <Spinner className="h-5 w-5 text-blue-600" />
+            <Spinner className="h-5 w-5 text-hg-primary" />
           </div>
         )}
         {/* Add New button at bottom */}
         <button
           onClick={onCreateClick}
-          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-700/50 rounded-lg transition-colors cursor-pointer"
+          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-hg-on-surface-variant/50 hover:text-hg-on-surface-variant hover:bg-hg-surface-container-low rounded-lg transition-colors cursor-pointer"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -558,13 +490,13 @@ function ScrollSentinel({ onIntersect, hasMore, loading }: ScrollSentinelProps) 
 // Priority Badge Component - maps session status to priority display
 function PriorityBadge({ status }: { status: SessionStatus }) {
   const config: Record<SessionStatus, { label: string; color: string; icon: string }> = {
-    failed: { label: 'Failed', color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300', icon: '!' },
-    in_progress: { label: 'WIP', color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300', icon: '~' },
-    approval: { label: 'Action', color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300', icon: '?' },
-    triage: { label: 'Todo', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400', icon: '○' },
-    completed: { label: 'Done', color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300', icon: '✓' },
-    done: { label: 'Done', color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300', icon: '✓' },
-    archived: { label: 'Archived', color: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-500', icon: '-' },
+    failed: { label: 'Failed', color: 'bg-hg-error/10 text-hg-error', icon: '!' },
+    in_progress: { label: 'WIP', color: 'bg-hg-primary/10 text-hg-primary', icon: '~' },
+    approval: { label: 'Action', color: 'bg-amber-500/10 text-amber-500', icon: '?' },
+    triage: { label: 'Todo', color: 'bg-hg-surface-container-high text-hg-on-surface-variant', icon: '○' },
+    completed: { label: 'Done', color: 'bg-emerald-500/10 text-emerald-500', icon: '✓' },
+    done: { label: 'Done', color: 'bg-emerald-500/10 text-emerald-500', icon: '✓' },
+    archived: { label: 'Archived', color: 'bg-hg-surface-container-high text-hg-on-surface-variant', icon: '-' },
   };
   const { label, color, icon } = config[status];
 
@@ -593,7 +525,7 @@ function CategoryIcon({ type }: { type: string }) {
   if (lowerType === 'vibe') {
     return (
       <img
-        src="/m-rainbow.png"
+        src="/mistral.svg"
         alt="Vibe"
         title="Vibe"
         className="w-3 h-5 object-contain"
@@ -603,7 +535,7 @@ function CategoryIcon({ type }: { type: string }) {
 
   // Fallback for unknown types
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-hg-surface-container-high text-hg-on-surface-variant">
       {type}
     </span>
   );
@@ -673,135 +605,50 @@ function SessionCard({ session, onDragStart, onDragEnd, onClick, isDragging, per
       onDragEnd={onDragEnd}
       onClick={onClick}
       className={`
-        p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800
-        cursor-pointer hover:shadow-md transition-all
+        p-3 rounded-lg border border-hg-outline-variant/30 bg-hg-surface-container-low
+        cursor-pointer hover:border-hg-primary/30 hover:shadow-lg transition-all
         ${isDragging ? 'opacity-50 rotate-2 scale-105' : ''}
       `}
     >
       {/* Title */}
-      <h3 className="font-medium text-sm text-gray-900 dark:text-gray-100 mb-1 line-clamp-2">
+      <h3 className="font-medium text-sm text-hg-on-surface mb-1.5 line-clamp-2">
         {displayName}
       </h3>
       {/* Footer: Metadata row */}
-      <div className="flex items-center justify-between text-xs text-gray-400 mb-2 dark:text-gray-500">
-        <div className="flex flex-col gap-1 overflow-hidden">
+      <div className="flex items-center justify-between text-xs text-hg-on-surface-variant/70 mb-2.5">
+        <div className="flex flex-col gap-0.5 overflow-hidden font-mono">
           <div className='truncate'>{workDir}</div>
           <div className='truncate'>{dateDisplay}</div>
         </div>
       </div>
-      {/* Tags */}
-      <div className="flex flex-wrap gap-1 mb-0">
+      {/* Tags — pill badges matching design */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-0">
         <CategoryIcon type={session.connectorType} />
-        {session.approvalMode === 'auto' && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md text-gray-500 dark:text-gray-400">
-            Auto
-          </span>
-        )}
-        {session.agentMode === 'plan' && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md text-gray-500 dark:text-gray-400">
-            Plan
-          </span>
-        )}
         {personality && (
-          <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-md text-gray-500 dark:text-gray-400" title={personality.name}>
+          <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-hg-primary/10 text-hg-primary" title={personality.name}>
             {personality.readableId}
           </span>
         )}
         {project && (
-          <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-md text-gray-500 dark:text-gray-400" title={`Project: ${project.name}`}>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-hg-tertiary/10 text-hg-tertiary" title={`Project: ${project.name}`}>
+            <span>{project.icon || '📁'}</span>
             {project.name}
+          </span>
+        )}
+        {session.approvalMode === 'auto' && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-hg-surface-container-high text-hg-on-surface-variant">
+            Auto
+          </span>
+        )}
+        {session.agentMode === 'plan' && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-hg-surface-container-high text-hg-on-surface-variant">
+            Plan
           </span>
         )}
         {isInProgress && (
           <div className="ml-auto">
-            <Spinner className="h-4 w-4 text-gray-400" />
+            <Spinner className="h-4 w-4 text-hg-primary" />
           </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Scheduled Tasks Column Component
-interface ScheduledTasksColumnProps {
-  tasks: ScheduledTask[];
-  loading: boolean;
-  onTaskClick: (taskId: string) => void;
-  onToggleEnabled: (taskId: string, enabled: boolean) => void;
-  onTrigger: (taskId: string) => void;
-  onCreateClick: () => void;
-}
-
-function ScheduledTasksColumn({
-  tasks = [],
-  loading,
-  onTaskClick,
-  onToggleEnabled,
-  onTrigger,
-  onCreateClick,
-}: ScheduledTasksColumnProps) {
-  const enabledTasks = tasks.filter(t => t.enabled);
-  const disabledTasks = tasks.filter(t => !t.enabled);
-
-  return (
-    <div className="flex flex-col w-72 h-full bg-blue-50/30 dark:bg-blue-900/10 rounded-lg">
-      {/* Column Header */}
-      <div className="flex items-center justify-between px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <div className="w-1 h-4 rounded-full bg-blue-500" />
-          <h2 className="font-medium text-sm text-gray-700 dark:text-gray-200">Scheduled</h2>
-          <span className="text-sm text-gray-400">
-            {enabledTasks.length}
-          </span>
-        </div>
-        <button
-          onClick={onCreateClick}
-          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors cursor-pointer"
-          title="Add scheduled task"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Column Content */}
-      <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-2">
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Spinner className="h-6 w-6 text-blue-500" />
-          </div>
-        ) : tasks.length === 0 ? (
-          <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">
-            No scheduled tasks
-          </div>
-        ) : (
-          <>
-            {/* Enabled tasks first */}
-            {enabledTasks.map((task) => (
-              <ScheduledTaskCard
-                key={task.id}
-                task={task}
-                onClick={() => onTaskClick(task.id)}
-                onToggleEnabled={(enabled) => onToggleEnabled(task.id, enabled)}
-                onTrigger={() => onTrigger(task.id)}
-              />
-            ))}
-            {/* Disabled tasks */}
-            {disabledTasks.length > 0 && enabledTasks.length > 0 && (
-              <div className="text-xs text-gray-400 dark:text-gray-500 px-1 pt-2">
-                Disabled ({disabledTasks.length})
-              </div>
-            )}
-            {disabledTasks.map((task) => (
-              <ScheduledTaskCard
-                key={task.id}
-                task={task}
-                onClick={() => onTaskClick(task.id)}
-                onToggleEnabled={(enabled) => onToggleEnabled(task.id, enabled)}
-              />
-            ))}
-          </>
         )}
       </div>
     </div>
@@ -837,14 +684,14 @@ function ProjectSwitcher({ projects, value, onChange }: ProjectSwitcherProps) {
     <div className="min-w-[140px] md:min-w-[180px]" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 rounded-lg border border-[var(--input-border)] hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-xs md:text-sm cursor-pointer"
+        className="w-full flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 rounded-lg border border-hg-outline-variant/30 hover:bg-hg-surface-container-high transition-colors text-xs md:text-sm cursor-pointer text-hg-on-surface"
       >
-        <svg className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0 text-hg-on-surface-variant" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
         <span className="flex-1 truncate text-left font-medium">{selectedLabel}</span>
         <svg
-          className={`w-3 h-3 md:w-4 md:h-4 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`w-3 h-3 md:w-4 md:h-4 flex-shrink-0 transition-transform text-hg-on-surface-variant ${open ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -854,18 +701,18 @@ function ProjectSwitcher({ projects, value, onChange }: ProjectSwitcherProps) {
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg shadow-lg z-50 overflow-hidden min-w-[160px]">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-hg-surface-container border border-hg-outline-variant/30 rounded-lg shadow-xl z-50 overflow-hidden min-w-[160px]">
           <button
             onClick={() => { onChange(''); setOpen(false); }}
             className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors cursor-pointer ${
               !value
-                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                ? 'bg-hg-primary/10 text-hg-primary'
+                : 'text-hg-on-surface hover:bg-hg-surface-container-high'
             }`}
           >
             <span className="flex-1 truncate">All Projects</span>
             {!value && (
-              <svg className="w-4 h-4 flex-shrink-0 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 flex-shrink-0 text-hg-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             )}
@@ -876,13 +723,13 @@ function ProjectSwitcher({ projects, value, onChange }: ProjectSwitcherProps) {
               onClick={() => { onChange(project.id); setOpen(false); }}
               className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors cursor-pointer ${
                 value === project.id
-                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'bg-hg-primary/10 text-hg-primary'
+                  : 'text-hg-on-surface hover:bg-hg-surface-container-high'
               }`}
             >
               <span className="flex-1 truncate">{project.name}</span>
               {value === project.id && (
-                <svg className="w-4 h-4 flex-shrink-0 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 flex-shrink-0 text-hg-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               )}
@@ -928,14 +775,14 @@ function WorkDirSwitcher({ workDirs, value, onChange }: WorkDirSwitcherProps) {
     <div className="min-w-[140px] md:min-w-[180px]" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 rounded-lg border border-[var(--input-border)] hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-xs md:text-sm cursor-pointer"
+        className="w-full flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 rounded-lg border border-hg-outline-variant/30 hover:bg-hg-surface-container-high transition-colors text-xs md:text-sm cursor-pointer text-hg-on-surface"
       >
-        <svg className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0 text-hg-on-surface-variant" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
         <span className="flex-1 truncate text-left font-medium">{selectedLabel}</span>
         <svg
-          className={`w-3 h-3 md:w-4 md:h-4 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`w-3 h-3 md:w-4 md:h-4 flex-shrink-0 transition-transform text-hg-on-surface-variant ${open ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -945,18 +792,18 @@ function WorkDirSwitcher({ workDirs, value, onChange }: WorkDirSwitcherProps) {
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-lg shadow-lg z-[100] overflow-hidden min-w-[200px] max-w-[350px] max-h-[300px] overflow-y-auto">
+        <div className="absolute top-full left-0 mt-1 bg-hg-surface-container border border-hg-outline-variant/30 rounded-lg shadow-xl z-[100] overflow-hidden min-w-[200px] max-w-[350px] max-h-[300px] overflow-y-auto">
           <button
             onClick={() => { onChange(''); setOpen(false); }}
             className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors cursor-pointer ${
               !value
-                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                ? 'bg-hg-primary/10 text-hg-primary'
+                : 'text-hg-on-surface hover:bg-hg-surface-container-high'
             }`}
           >
             <span className="flex-1 truncate">All Directories</span>
             {!value && (
-              <svg className="w-4 h-4 flex-shrink-0 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 flex-shrink-0 text-hg-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             )}
@@ -967,14 +814,14 @@ function WorkDirSwitcher({ workDirs, value, onChange }: WorkDirSwitcherProps) {
               onClick={() => { onChange(workDir); setOpen(false); }}
               className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors cursor-pointer ${
                 value === workDir
-                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'bg-hg-primary/10 text-hg-primary'
+                  : 'text-hg-on-surface hover:bg-hg-surface-container-high'
               }`}
               title={workDir}
             >
               <span className="flex-1 truncate">{getShortPath(workDir)}</span>
               {value === workDir && (
-                <svg className="w-4 h-4 flex-shrink-0 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 flex-shrink-0 text-hg-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               )}

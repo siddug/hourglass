@@ -4,8 +4,9 @@ import { eq, desc, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { projects, sessions, personalities, scheduledTasks } from '../../db/schema.js';
+import { projects, sessions, personalities, scheduledTasks, apiKeys } from '../../db/schema.js';
 import { initializeProjectWorkspace, getProjectWorkspacePath } from '../../services/project-workspace.js';
+import { generateProjectIcon } from '../../utils/project-icon-generator.js';
 
 /**
  * Validate project slug: lowercase alphanumeric, hyphens, underscores
@@ -22,6 +23,7 @@ const createProjectSchema = z.object({
 
 const updateProjectSchema = z.object({
   name: z.string().min(1).max(200).optional(),
+  icon: z.string().max(10).optional(),
   status: z.enum(['active', 'archived']).optional(),
 });
 
@@ -30,6 +32,16 @@ const updateProjectSchema = z.object({
  */
 export const projectsRoutes: FastifyPluginAsync = async (server) => {
   const { db } = server.state;
+
+  /** Helper: fetch LLM API keys from DB + env */
+  function getLlmApiKeys() {
+    const anthropicKey = db.db.select().from(apiKeys).where(eq(apiKeys.provider, 'anthropic')).get();
+    const mistralKey = db.db.select().from(apiKeys).where(eq(apiKeys.provider, 'mistral')).get();
+    return {
+      anthropic: anthropicKey?.apiKey || process.env.ANTHROPIC_API_KEY,
+      mistral: mistralKey?.apiKey || process.env.MISTRAL_API_KEY,
+    };
+  }
 
   /**
    * GET /api/projects
@@ -179,6 +191,17 @@ export const projectsRoutes: FastifyPluginAsync = async (server) => {
       updatedAt: now,
     }).run();
 
+    // Auto-generate icon in the background
+    const keys = getLlmApiKeys();
+    generateProjectIcon(name, keys).then((icon) => {
+      if (icon) {
+        db.db.update(projects).set({ icon, updatedAt: new Date() }).where(eq(projects.id, id)).run();
+        server.log.info({ projectId: id, icon }, 'Auto-generated project icon');
+      }
+    }).catch((err) => {
+      server.log.warn({ projectId: id, err }, 'Failed to auto-generate project icon');
+    });
+
     const created = db.db.select().from(projects).where(eq(projects.id, id)).get();
 
     server.log.info({ projectId: id, slug: projectSlug, workspacePath }, 'Created project with workspace');
@@ -213,12 +236,38 @@ export const projectsRoutes: FastifyPluginAsync = async (server) => {
 
     const updates: Record<string, any> = { updatedAt: new Date() };
     if (body.data.name !== undefined) updates.name = body.data.name;
+    if (body.data.icon !== undefined) updates.icon = body.data.icon;
     if (body.data.status !== undefined) updates.status = body.data.status;
 
     db.db.update(projects)
       .set(updates)
       .where(eq(projects.id, id))
       .run();
+
+    const updated = db.db.select().from(projects).where(eq(projects.id, id)).get();
+    return reply.send(updated);
+  });
+
+  /**
+   * POST /api/projects/:id/generate-icon
+   * Generate (or regenerate) a project icon using LLM
+   */
+  server.post<{ Params: { id: string } }>('/projects/:id/generate-icon', async (request, reply) => {
+    const { id } = request.params;
+
+    const project = db.db.select().from(projects).where(eq(projects.id, id)).get();
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
+
+    const keys = getLlmApiKeys();
+    const icon = await generateProjectIcon(project.name, keys);
+
+    if (!icon) {
+      return reply.status(502).send({ error: 'Failed to generate icon — no LLM API keys available or generation failed' });
+    }
+
+    db.db.update(projects).set({ icon, updatedAt: new Date() }).where(eq(projects.id, id)).run();
 
     const updated = db.db.select().from(projects).where(eq(projects.id, id)).get();
     return reply.send(updated);

@@ -364,6 +364,7 @@ export interface Project {
   name: string;
   projectSlug: string;
   workspacePath: string;
+  icon: string | null;
   status: ProjectStatus;
   createdAt: string;
   updatedAt: string;

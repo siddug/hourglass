@@ -11,17 +11,17 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className = '', variant = 'primary', size = 'md', ...props }, ref) => {
-    const baseClasses = 'inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none';
+    const baseClasses = 'inline-flex items-center justify-center rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none';
 
     const variants = {
-      primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
-      secondary: 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 focus:ring-gray-500',
-      danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
-      ghost: 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:ring-gray-500',
+      primary: 'bg-hg-primary text-white hover:opacity-90 focus:ring-hg-primary/50',
+      secondary: 'bg-hg-surface-container-high text-hg-on-surface hover:bg-hg-surface-variant focus:ring-hg-outline-variant',
+      danger: 'bg-hg-error text-white hover:opacity-90 focus:ring-hg-error/50',
+      ghost: 'bg-transparent text-hg-on-surface-variant hover:bg-hg-surface-container focus:ring-hg-outline-variant',
     };
 
     const sizes = {
-      sm: 'px-3 py-1.5 text-sm',
+      sm: 'px-3 py-1.5 text-xs',
       md: 'px-4 py-2 text-sm',
       lg: 'px-6 py-3 text-base',
     };
@@ -45,7 +45,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <input
         ref={ref}
-        className={`w-full px-3 py-2 border border-[var(--input-border)] bg-[var(--input-bg)] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${className}`}
+        className={`w-full px-3 py-2 border border-hg-outline-variant/30 bg-hg-surface-container rounded-lg text-hg-on-surface shadow-sm focus:outline-none focus:ring-2 focus:ring-hg-primary/50 focus:border-hg-primary/50 ${className}`}
         {...props}
       />
     );
@@ -61,7 +61,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     return (
       <textarea
         ref={ref}
-        className={`w-full px-3 py-2 border border-[var(--input-border)] bg-[var(--input-bg)] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none ${className}`}
+        className={`w-full px-3 py-2 border border-hg-outline-variant/30 bg-hg-surface-container rounded-lg text-hg-on-surface shadow-sm focus:outline-none focus:ring-2 focus:ring-hg-primary/50 focus:border-hg-primary/50 resize-none ${className}`}
         {...props}
       />
     );
@@ -77,7 +77,7 @@ interface CardProps {
 
 export function Card({ children, className = '' }: CardProps) {
   return (
-    <div className={`bg-[var(--card-bg)] rounded-lg border border-[var(--card-border)] shadow-sm ${className}`}>
+    <div className={`bg-hg-surface-container-low rounded-xl border border-hg-outline-variant/20 shadow-sm ${className}`}>
       {children}
     </div>
   );
@@ -85,7 +85,7 @@ export function Card({ children, className = '' }: CardProps) {
 
 export function CardHeader({ children, className = '' }: CardProps) {
   return (
-    <div className={`px-4 py-3 border-b border-[var(--card-border)] ${className}`}>
+    <div className={`px-4 py-3 border-b border-hg-outline-variant/20 ${className}`}>
       {children}
     </div>
   );
@@ -104,14 +104,14 @@ interface BadgeProps {
 
 export function Badge({ children, variant = 'default', className = '' }: BadgeProps) {
   const variants = {
-    default: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200',
-    success: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300',
-    warning: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300',
-    error: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
-    info: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300',
-    approval: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-300',
-    done: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300',
-    archived: 'bg-slate-100 dark:bg-slate-900/30 text-slate-800 dark:text-slate-300',
+    default: 'bg-hg-surface-container-high text-hg-on-surface-variant',
+    success: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    warning: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    error: 'bg-hg-error/10 text-hg-error',
+    info: 'bg-hg-primary/10 text-hg-primary',
+    approval: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400',
+    done: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    archived: 'bg-slate-500/10 text-slate-600 dark:text-slate-400',
   };
 
   return (
@@ -128,16 +128,15 @@ export function StatusBadge({ status }: { status: string }) {
   const variantMap: Record<string, BadgeProps['variant']> = {
     triage: 'warning',
     in_progress: 'info',
-    running: 'info', // Legacy support
+    running: 'info',
     completed: 'success',
     failed: 'error',
-    killed: 'warning', // Legacy support
+    killed: 'warning',
     approval: 'approval',
     done: 'done',
     archived: 'archived',
   };
 
-  // Display friendly labels
   const labelMap: Record<string, string> = {
     triage: 'Todo',
     in_progress: 'Agent WIP',
@@ -153,30 +152,29 @@ export function StatusBadge({ status }: { status: string }) {
   return <Badge variant={variantMap[status] || 'default'}>{labelMap[status] || status}</Badge>;
 }
 
-// Provider badge helper - shows the AI provider with distinct styling
+// Provider badge helper
 interface ProviderBadgeProps {
   provider: string;
   className?: string;
 }
 
 export function ProviderBadge({ provider, className = '' }: ProviderBadgeProps) {
-  // Map connector names to display info
   const providerStyles: Record<string, { bg: string; text: string; label: string }> = {
     claude: {
-      bg: 'bg-orange-100 dark:bg-orange-900/30',
-      text: 'text-orange-800 dark:text-orange-300',
+      bg: 'bg-orange-500/10',
+      text: 'text-orange-600 dark:text-orange-400',
       label: 'Claude',
     },
     vibe: {
-      bg: 'bg-purple-100 dark:bg-purple-900/30',
-      text: 'text-purple-800 dark:text-purple-300',
+      bg: 'bg-hg-tertiary/10',
+      text: 'text-hg-tertiary',
       label: 'Mistral Vibe',
     },
   };
 
   const style = providerStyles[provider] || {
-    bg: 'bg-gray-100 dark:bg-gray-700',
-    text: 'text-gray-800 dark:text-gray-200',
+    bg: 'bg-hg-surface-container-high',
+    text: 'text-hg-on-surface-variant',
     label: provider,
   };
 
@@ -189,14 +187,13 @@ export function ProviderBadge({ provider, className = '' }: ProviderBadgeProps) 
   );
 }
 
-// AI Logo component - shows the appropriate logo based on connector type
+// AI Logo component
 interface AILogoProps {
   provider: string;
   className?: string;
 }
 
 export function AILogo({ provider, className = '' }: AILogoProps) {
-  // Map connector names to appropriate logos
   const getLogo = () => {
     switch (provider.toLowerCase()) {
       case 'claude':
@@ -209,7 +206,7 @@ export function AILogo({ provider, className = '' }: AILogoProps) {
       case 'mistral':
         return (
           <div className={`w-6 h-6 flex items-center justify-center ${className}`}>
-            <img src="/m-rainbow.png" alt="Mistral Vibe" className="w-full h-full object-contain" />
+            <img src="/mistral.svg" alt="Mistral Vibe" className="w-full h-full object-contain" />
           </div>
         );
       default:
@@ -224,7 +221,7 @@ export function AILogo({ provider, className = '' }: AILogoProps) {
   return getLogo();
 }
 
-// User Avatar component - shows a generic person icon
+// User Avatar component
 interface UserAvatarProps {
   className?: string;
 }
@@ -232,7 +229,7 @@ interface UserAvatarProps {
 export function UserAvatar({ className = '' }: UserAvatarProps) {
   return (
     <div className={`w-6 h-6 flex items-center justify-center ${className}`}>
-      <div className="w-5 h-5 rounded-full bg-gray-300 dark:bg-gray-600" />
+      <div className="w-5 h-5 rounded-full bg-hg-surface-container-high" />
     </div>
   );
 }
@@ -244,7 +241,6 @@ interface DialogProps {
   children: React.ReactNode;
   title?: string;
   className?: string;
-  /** When true, dialog expands to fill available height (90vh) instead of shrinking to content */
   fullHeight?: boolean;
 }
 
@@ -256,16 +252,16 @@ export function Dialog({ open, onClose, children, title, className = 'max-w-lg',
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
-        className="fixed inset-0 bg-black/50"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className={`relative bg-[var(--card-bg)] rounded-lg shadow-xl w-full mx-4 ${heightClasses} overflow-hidden flex flex-col ${className}`}>
+      <div className={`relative bg-hg-surface-container-low rounded-xl border border-hg-outline-variant/20 shadow-xl w-full mx-4 ${heightClasses} overflow-hidden flex flex-col ${className}`}>
         {title && (
-          <div className="px-4 py-3 border-b border-[var(--card-border)] flex items-center justify-between flex-shrink-0">
-            <h2 className="text-lg font-semibold">{title}</h2>
+          <div className="px-4 py-3 border-b border-hg-outline-variant/20 flex items-center justify-between flex-shrink-0">
+            <h2 className="text-lg font-semibold text-hg-on-surface">{title}</h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
+              className="text-hg-on-surface-variant hover:text-hg-on-surface cursor-pointer transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -301,14 +297,14 @@ export function Dropdown({ value, onChange, options, className = '', disabled = 
 
   const sizeStyles = {
     sm: {
-      button: 'py-1 pl-2 pr-6 text-xs rounded',
+      button: 'py-1 pl-2 pr-6 text-xs rounded-lg',
       iconContainer: 'pr-1.5',
       icon: 'h-4 w-4',
       option: 'py-1.5 pl-7 pr-3',
       checkIcon: 'pl-2 h-7 w-5',
     },
     md: {
-      button: 'py-1.5 pl-3 pr-8 text-sm rounded-md',
+      button: 'py-1.5 pl-3 pr-8 text-sm rounded-lg',
       iconContainer: 'pr-2',
       icon: 'h-4 w-4',
       option: 'py-2 pl-2 pr-4',
@@ -322,14 +318,14 @@ export function Dropdown({ value, onChange, options, className = '', disabled = 
     <Listbox value={value} onChange={onChange} disabled={disabled}>
       <div className={`relative ${className}`}>
         <ListboxButton
-          className={`relative w-full border h-full border-[var(--input-border)] bg-[var(--input-bg)] ${styles.button} text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          className={`relative w-full border h-full border-hg-outline-variant/30 bg-hg-surface-container ${styles.button} text-left text-hg-on-surface focus:outline-none focus:ring-2 focus:ring-hg-primary/50 focus:border-hg-primary/50 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
         >
           <span className="flex items-center gap-2 truncate">
             {selectedOption?.icon}
             {selectedOption?.label || placeholder || 'Select...'}
           </span>
           <span className={`pointer-events-none absolute inset-y-0 right-0 flex items-center ${styles.iconContainer}`}>
-            <svg className={`${styles.icon} text-gray-400`} viewBox="0 0 20 20" fill="currentColor">
+            <svg className={`${styles.icon} text-hg-on-surface-variant`} viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
             </svg>
           </span>
@@ -337,13 +333,13 @@ export function Dropdown({ value, onChange, options, className = '', disabled = 
 
         <ListboxOptions
           anchor="bottom"
-          className={`absolute z-50 mt-1 max-h-60 min-w-[var(--button-width)] overflow-auto rounded-md bg-[var(--card-bg)] py-1 ${size === 'sm' ? 'text-xs' : 'text-sm'} shadow-lg ring-1 ring-black/5 focus:outline-none`}
+          className={`absolute z-50 mt-1 max-h-60 min-w-[var(--button-width)] overflow-auto rounded-lg bg-hg-surface-container-low border border-hg-outline-variant/20 py-1 ${size === 'sm' ? 'text-xs' : 'text-sm'} shadow-lg focus:outline-none`}
         >
           {options.map((option) => (
             <ListboxOption
               key={option.value}
               value={option.value}
-              className={`group relative cursor-pointer select-none ${styles.option} text-[var(--text-primary)] data-[focus]:bg-blue-600 data-[focus]:text-white`}
+              className={`group relative cursor-pointer select-none ${styles.option} text-hg-on-surface data-[focus]:bg-hg-primary data-[focus]:text-white`}
             >
               {({ selected }) => (
                 <>
@@ -352,7 +348,7 @@ export function Dropdown({ value, onChange, options, className = '', disabled = 
                     {option.label}
                   </span>
                   {selected && (
-                    <span className={`absolute inset-y-0 left-0 flex items-center ${styles.checkIcon} text-blue-600 group-data-[focus]:text-white`}>
+                    <span className={`absolute inset-y-0 left-0 flex items-center ${styles.checkIcon} text-hg-primary group-data-[focus]:text-white`}>
                       <svg className="h-7 w-6" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
                       </svg>
@@ -368,7 +364,7 @@ export function Dropdown({ value, onChange, options, className = '', disabled = 
   );
 }
 
-// IconButton component - just an icon that's clickable (no button background)
+// IconButton component
 interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'default' | 'primary' | 'danger' | 'warning';
   size?: 'sm' | 'md' | 'lg';
@@ -377,10 +373,10 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
   ({ className = '', variant = 'default', size = 'md', disabled, ...props }, ref) => {
     const variants = {
-      default: 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300',
-      primary: 'text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300',
-      danger: 'text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300',
-      warning: 'text-yellow-500 hover:text-yellow-600 dark:text-yellow-400 dark:hover:text-yellow-300',
+      default: 'text-hg-on-surface-variant hover:text-hg-on-surface',
+      primary: 'text-hg-primary hover:text-hg-primary/80',
+      danger: 'text-hg-error hover:text-hg-error/80',
+      warning: 'text-amber-500 hover:text-amber-600',
     };
 
     const sizes = {

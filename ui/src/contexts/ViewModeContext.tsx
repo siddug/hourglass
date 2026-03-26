@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
-export type ViewMode = 'kanban' | 'sessions' | 'files';
+export type ViewMode = 'kanban' | 'sessions' | 'files' | 'settings';
 
 interface ViewModeContextType {
   viewMode: ViewMode;
@@ -24,7 +24,7 @@ export function ViewModeProvider({ children }: ViewModeProviderProps) {
   // Load saved view mode from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY) as ViewMode | null;
-    if (saved && ['kanban', 'sessions', 'files'].includes(saved)) {
+    if (saved && ['kanban', 'sessions', 'files', 'settings'].includes(saved)) {
       setViewModeState(saved);
     }
     setIsHydrated(true);
