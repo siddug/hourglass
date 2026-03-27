@@ -26,6 +26,7 @@ import {
 import { useLogStream, type LogMessage } from '@/hooks/useLogStream';
 import { useApprovalStream } from '@/hooks/useApprovalStream';
 import { usePaginatedSessions } from '@/hooks/usePaginatedSessions';
+import { useCommandCenter, type CommandSessionTab } from '@/contexts/CommandCenterContext';
 import ReactMarkdown from 'react-markdown';
 import {
   Button,
@@ -53,6 +54,7 @@ interface ConversationTurn {
 
 interface SessionDetailViewProps {
   sessionId: string;
+  initialTab?: CommandSessionTab;
   onNavigateHome?: () => void;
   showCloseButton?: boolean;
   onClose?: () => void;
@@ -61,11 +63,13 @@ interface SessionDetailViewProps {
 
 export function SessionDetailView({
   sessionId,
+  initialTab,
   onNavigateHome,
   showCloseButton,
   onClose,
   compact = false,
 }: SessionDetailViewProps) {
+  const { registerFocusedSession } = useCommandCenter();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,7 +77,7 @@ export function SessionDetailView({
   const [followUpImages, setFollowUpImages] = useState<ImageData[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [conversationTurns, setConversationTurns] = useState<ConversationTurn[]>([]);
-  const [activeTab, setActiveTab] = useState<SessionTab>('agent');
+  const [activeTab, setActiveTab] = useState<SessionTab>(initialTab ?? 'agent');
 
   // Session name editing
   const [editingName, setEditingName] = useState(false);
@@ -119,6 +123,12 @@ export function SessionDetailView({
   useEffect(() => {
     fetchSession();
   }, [fetchSession]);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Poll when session is in_progress
   useEffect(() => {
@@ -282,6 +292,7 @@ export function SessionDetailView({
 
   const handleToggleMode = async () => {
     if (!session) return;
+    if (session.connectorType === 'codex' && session.approvalMode === 'auto') return;
     const newMode: ApprovalMode = session.approvalMode === 'manual' ? 'auto' : 'manual';
     try {
       await updateSessionMode(sessionId, { approvalMode: newMode });
@@ -300,6 +311,17 @@ export function SessionDetailView({
     }
   };
 
+  const handleStartRename = useCallback(() => {
+    if (!session) return;
+
+    setNameInput(session.sessionName || '');
+    if (window.innerWidth < 768) {
+      setShowNameModal(true);
+    } else {
+      setEditingName(true);
+    }
+  }, [session]);
+
   const handleSaveName = async () => {
     if (!session) return;
     try {
@@ -314,6 +336,23 @@ export function SessionDetailView({
 
   // Use paginated sessions hook for smart refresh
   const { smartRefresh } = usePaginatedSessions();
+
+  useEffect(() => {
+    if (!session) {
+      registerFocusedSession(null);
+      return;
+    }
+
+    registerFocusedSession({
+      session,
+      activeTab,
+      setActiveTab: (tab) => setActiveTab(tab as SessionTab),
+      openRename: handleStartRename,
+      refresh: fetchSession,
+    });
+
+    return () => registerFocusedSession(null);
+  }, [activeTab, fetchSession, handleStartRename, registerFocusedSession, session]);
 
   const handleToggleStatus = async (newStatus: SessionStatus) => {
     if (!session) return;
@@ -350,6 +389,8 @@ export function SessionDetailView({
 
   const isRunning = session.status === 'in_progress';
   const canFollowUp = !isRunning && (session.status === 'completed' || session.status === 'failed' || session.status === 'done') && session.agentSessionId;
+  const manualApprovalSupported = session.connectorType !== 'codex';
+  const approvalToggleDisabled = !manualApprovalSupported && session.approvalMode === 'auto';
 
   // Sort turns by creation time
   const sortedTurns = [...conversationTurns].sort(
@@ -390,15 +431,7 @@ export function SessionDetailView({
                   </span>
                 </div>
                 <button
-                  onClick={() => {
-                    setNameInput(session.sessionName || '');
-                    // On mobile, show modal; on desktop, show inline
-                    if (window.innerWidth < 768) {
-                      setShowNameModal(true);
-                    } else {
-                      setEditingName(true);
-                    }
-                  }}
+                  onClick={handleStartRename}
                   className="text-hg-on-surface-variant hover:text-hg-on-surface cursor-pointer"
                   title="Edit session name"
                 >
@@ -718,15 +751,18 @@ export function SessionDetailView({
               {/* Approval Mode Toggle */}
               <button
                 onClick={handleToggleMode}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${session.approvalMode === 'auto'
+                disabled={approvalToggleDisabled}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${approvalToggleDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${session.approvalMode === 'auto'
                     ? 'bg-hg-surface-container-high text-hg-on-surface-variant hover:bg-hg-outline-variant'
                     : 'bg-hg-surface-container-high text-hg-on-surface-variant hover:bg-hg-outline-variant'
                   }`}
-                title={session.approvalMode === 'auto'
+                title={approvalToggleDisabled
+                  ? 'Codex CLI sessions currently support auto approval only.'
+                  : session.approvalMode === 'auto'
                   ? 'All tool calls are being auto-approved. Click to switch to manual mode.'
                   : 'Click to switch to auto-approve mode'}
               >
-                {session.approvalMode === 'auto' ? 'Auto approve' : 'Manual'}
+                {approvalToggleDisabled ? 'Auto only' : (session.approvalMode === 'auto' ? 'Auto approve' : 'Manual')}
               </button>
             </div>
             <div className="flex items-center gap-1">
@@ -1157,6 +1193,7 @@ function getConnectorDisplayName(connectorType: string): string {
     claude: 'Claude',
     vibe: 'Mistral Vibe',
     mistral: 'Mistral',
+    codex: 'Codex CLI',
   };
   return connectorNames[connectorType.toLowerCase()] || connectorType;
 }
@@ -1266,6 +1303,49 @@ function parseLogContent(content: string): ParsedMessage[] {
 
     if (data.jsonrpc === '2.0') {
       return [{ type: 'raw', content: '' }];
+    }
+
+    // ACP-normalized events
+    if (data.type === 'message' && data.content) {
+      return [{
+        type: 'assistant',
+        content: ensureString(data.content),
+      }];
+    }
+
+    if (data.type === 'thought' && data.content) {
+      return [{
+        type: 'thinking',
+        content: ensureString(data.content),
+      }];
+    }
+
+    if (data.type === 'toolCall' && data.toolCall) {
+      return [{
+        type: 'tool_call',
+        content: formatToolInputForDisplay(data.toolCall.input),
+        toolName: data.toolCall.name || 'tool',
+        toolId: data.toolCall.id,
+      }];
+    }
+
+    if (data.type === 'toolUpdate' && data.update) {
+      const output = ensureString(data.update.output || data.update.error);
+      const isError = data.update.status === 'failed' || Boolean(data.update.error);
+      return [{
+        type: 'tool_result',
+        content: output || (isError ? 'Tool failed' : 'Completed'),
+        toolId: data.update.id,
+        isError,
+      }];
+    }
+
+    if (data.type === 'error') {
+      return [{
+        type: 'result',
+        content: ensureString(data.message) || 'Error',
+        isError: true,
+      }];
     }
 
     // vibe-server processed events
@@ -1459,10 +1539,309 @@ function parseLogContent(content: string): ParsedMessage[] {
       return [{ type: 'raw', content: '' }];
     }
 
+    if (typeof data.type === 'string' && data.type.includes('.')) {
+      switch (data.type) {
+        case 'thread.started':
+          return [{
+            type: 'system',
+            content: `Session started (${data.thread_id || 'unknown thread'})`,
+          }];
+
+        case 'turn.started':
+          return [{ type: 'raw', content: '' }];
+
+        case 'turn.completed': {
+          const text = extractCodexText(data);
+          return text
+            ? [{
+                type: 'result',
+                content: text,
+              }]
+            : [{ type: 'raw', content: '' }];
+        }
+
+        case 'turn.failed':
+          return [{
+            type: 'result',
+            content: extractCodexText(data) || 'Turn failed',
+            isError: true,
+          }];
+
+        case 'error':
+          return [{
+            type: 'result',
+            content: extractCodexText(data) || 'Error',
+            isError: true,
+          }];
+      }
+
+      if (data.type === 'item.started' || data.type === 'item.completed') {
+        return parseCodexItemLog(data);
+      }
+
+      if (data.type.startsWith('agent_message')) {
+        const text = extractCodexText(data);
+        return text ? [{ type: 'assistant', content: text }] : [{ type: 'raw', content: '' }];
+      }
+
+      if (data.type.startsWith('agent_reasoning')) {
+        const text = extractCodexText(data);
+        return text ? [{ type: 'thinking', content: text }] : [{ type: 'raw', content: '' }];
+      }
+
+      if (data.type.startsWith('exec_command')) {
+        const toolId = typeof data.call_id === 'string'
+          ? data.call_id
+          : typeof data.command_id === 'string'
+            ? data.command_id
+            : 'codex-shell';
+
+        if (data.type.endsWith('.begin') || data.type.endsWith('.started')) {
+          return [{
+            type: 'tool_call',
+            content: extractCodexCommandSummary(data),
+            toolName: 'shell',
+            toolId,
+          }];
+        }
+
+        return [{
+          type: 'tool_result',
+          content: extractCodexText(data) || extractCodexCommandSummary(data) || 'Command completed',
+          toolId,
+          isError: data.type.endsWith('.failed'),
+        }];
+      }
+
+      if (data.type.startsWith('patch_apply')) {
+        const toolId = typeof data.call_id === 'string' ? data.call_id : 'codex-patch';
+
+        if (data.type.endsWith('.begin') || data.type.endsWith('.started')) {
+          return [{
+            type: 'tool_call',
+            content: extractCodexPatchSummary(data),
+            toolName: 'apply_patch',
+            toolId,
+          }];
+        }
+
+        return [{
+          type: 'tool_result',
+          content: extractCodexText(data) || 'Patch applied',
+          toolId,
+          isError: data.type.endsWith('.failed'),
+        }];
+      }
+    }
+
     return [{ type: 'raw', content: content }];
   } catch {
     return [{ type: 'raw', content: content }];
   }
+}
+
+function extractCodexText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => extractCodexText(item)).filter(Boolean).join('');
+  }
+  if (typeof value !== 'object' || value === null) return '';
+
+  const record = value as Record<string, unknown>;
+  const directKeys = ['text', 'delta', 'message', 'content', 'output', 'aggregated_output', 'stdout', 'stderr'] as const;
+
+  for (const key of directKeys) {
+    const candidate = record[key];
+    if (typeof candidate === 'string' && candidate) {
+      return candidate;
+    }
+  }
+
+  if (record.error) {
+    const nested = extractCodexText(record.error);
+    if (nested) return nested;
+  }
+
+  if (record.last_message) {
+    const nested = extractCodexText(record.last_message);
+    if (nested) return nested;
+  }
+
+  if (record.item) {
+    const nested = extractCodexText(record.item);
+    if (nested) return nested;
+  }
+
+  return '';
+}
+
+function parseCodexItemLog(data: Record<string, unknown>): ParsedMessage[] {
+  const item = data.item;
+  if (typeof item !== 'object' || item === null) {
+    return [{ type: 'raw', content: '' }];
+  }
+
+  const codexItem = item as Record<string, unknown>;
+  const itemType = typeof codexItem.type === 'string' ? codexItem.type : null;
+  if (!itemType) {
+    return [{ type: 'raw', content: '' }];
+  }
+
+  switch (itemType) {
+    case 'agent_message': {
+      const text = extractCodexText(codexItem);
+      return text ? [{ type: 'assistant', content: text }] : [{ type: 'raw', content: '' }];
+    }
+
+    case 'agent_reasoning':
+    case 'reasoning': {
+      const text = extractCodexText(codexItem);
+      return text ? [{ type: 'thinking', content: text }] : [{ type: 'raw', content: '' }];
+    }
+
+    case 'command_execution': {
+      const toolId = extractCodexToolId(codexItem, 'codex-shell');
+      const status = getCodexItemStatus(data.type, codexItem);
+
+      if (status === 'running') {
+        return [{
+          type: 'tool_call',
+          content: extractCodexCommandSummary(codexItem),
+          toolName: 'shell',
+          toolId,
+        }];
+      }
+
+      return [{
+        type: 'tool_result',
+        content: extractCodexCommandOutput(codexItem),
+        toolName: 'shell',
+        toolId,
+        isError: status === 'failed',
+      }];
+    }
+
+    case 'file_change': {
+      const toolId = extractCodexToolId(codexItem, 'codex-file-change');
+      const status = getCodexItemStatus(data.type, codexItem);
+      const summary = extractCodexFileChangeSummary(codexItem);
+
+      if (status === 'running') {
+        return [{
+          type: 'tool_call',
+          content: summary,
+          toolName: 'file_change',
+          toolId,
+        }];
+      }
+
+      return [{
+        type: 'tool_result',
+        content: summary,
+        toolName: 'file_change',
+        toolId,
+        isError: status === 'failed',
+      }];
+    }
+
+    default:
+      return [{ type: 'raw', content: '' }];
+  }
+}
+
+function extractCodexToolId(data: Record<string, unknown>, fallback: string): string {
+  const toolId = data.call_id || data.command_id || data.id || data.event_id;
+  return typeof toolId === 'string' ? toolId : fallback;
+}
+
+function getCodexItemStatus(type: unknown, item: Record<string, unknown>): 'running' | 'completed' | 'failed' {
+  if (type === 'item.started' || item.status === 'in_progress') {
+    return 'running';
+  }
+
+  const exitCode = typeof item.exit_code === 'number' ? item.exit_code : null;
+  if (item.status === 'failed' || (exitCode !== null && exitCode !== 0)) {
+    return 'failed';
+  }
+
+  return 'completed';
+}
+
+function extractCodexCommandOutput(data: Record<string, unknown>): string {
+  const output = extractCodexText(data);
+  if (output) {
+    return output;
+  }
+
+  const exitCode = typeof data.exit_code === 'number' ? data.exit_code : null;
+  if (exitCode !== null) {
+    return exitCode === 0
+      ? 'Command completed (exit code 0)'
+      : `Command failed (exit code ${exitCode})`;
+  }
+
+  return extractCodexCommandSummary(data) || 'Command completed';
+}
+
+function extractCodexCommandSummary(data: Record<string, unknown>): string {
+  if (typeof data.command === 'string' && data.command) {
+    return data.command;
+  }
+
+  if (Array.isArray(data.argv) && data.argv.length > 0) {
+    return data.argv.map((part) => String(part)).join(' ');
+  }
+
+  return 'Shell command';
+}
+
+function extractCodexFileChangeSummary(data: Record<string, unknown>): string {
+  if (!Array.isArray(data.changes) || data.changes.length === 0) {
+    return 'Files changed';
+  }
+
+  const lines = data.changes
+    .map((change) => {
+      if (typeof change !== 'object' || change === null) {
+        return null;
+      }
+
+      const record = change as Record<string, unknown>;
+      const kind = typeof record.kind === 'string' ? record.kind : 'update';
+      const path = typeof record.path === 'string' ? record.path : 'unknown file';
+      return `${kind}: ${path}`;
+    })
+    .filter((line): line is string => Boolean(line));
+
+  return lines.length > 0 ? lines.join('\n') : 'Files changed';
+}
+
+function extractCodexPatchSummary(data: Record<string, unknown>): string {
+  if (typeof data.path === 'string' && data.path) {
+    return `Patch: ${data.path}`;
+  }
+
+  if (typeof data.file_path === 'string' && data.file_path) {
+    return `Patch: ${data.file_path}`;
+  }
+
+  return 'Applying patch';
+}
+
+function formatToolInputForDisplay(input: unknown): string {
+  if (!input) return '';
+  if (typeof input === 'string') return input;
+  if (typeof input !== 'object') return String(input);
+
+  const record = input as Record<string, unknown>;
+  const parts: string[] = [];
+  if (record.command) parts.push(`command: "${String(record.command)}"`);
+  if (record.path) parts.push(`path: "${String(record.path)}"`);
+  if (record.file_path) parts.push(`file: "${String(record.file_path)}"`);
+  if (record.pattern) parts.push(`pattern: "${String(record.pattern)}"`);
+  if (parts.length > 0) return parts.join(', ');
+
+  return JSON.stringify(input, null, 2);
 }
 
 interface ParsedLogsResult {
@@ -1491,7 +1870,7 @@ function parseLogs(
       last.parsed.type === 'assistant' &&
       item.parsed.type === 'assistant'
     ) {
-      last.parsed.content += item.parsed.content;
+      last.parsed.content += last.parsed.content.endsWith('\n') ? item.parsed.content : `\n\n${item.parsed.content}`;
     } else {
       merged.push(item);
     }
@@ -1570,7 +1949,7 @@ function ConversationTurnView({
   const { process, logs, isLoading } = turn;
   const containerRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(isLive);
   const [isPromptExpanded, setIsPromptExpanded] = useState(false);
 
   // Check if prompt has more than 10 lines
@@ -1582,6 +1961,13 @@ function ConversationTurnView({
 
   const displayLogs = isLive ? liveLogs : logs;
   const { logs: parsedLogs, finalResult } = parseLogs(displayLogs);
+  const streamLogs = parsedLogs.filter(
+    (log) => log.parsed.type !== 'tool_call' && log.parsed.type !== 'tool_result'
+  );
+  const toolLogs = parsedLogs.filter(
+    (log) => log.parsed.type === 'tool_call' || log.parsed.type === 'tool_result'
+  );
+  const isToolSectionExpanded = isExpanded || (isLive && toolLogs.length > 0);
 
   useEffect(() => {
     if (isLive && autoScroll && containerRef.current) {
@@ -1597,7 +1983,8 @@ function ConversationTurnView({
     }
   };
 
-  const hasToolCalls = parsedLogs.some(log => log.parsed.type === 'tool_call' || log.parsed.type === 'tool_result');
+  const hasToolCalls = toolLogs.length > 0;
+  const hasStreamLogs = streamLogs.length > 0;
 
   return (
     <div className="space-y-3">
@@ -1654,21 +2041,46 @@ function ConversationTurnView({
             )}
           </div>
 
+          {/* Agent stream */}
+          {hasStreamLogs && (
+            <div className="bg-hg-surface-container-low rounded-lg border border-hg-outline-variant/15 overflow-hidden mb-3">
+              {isLoading ? (
+                <div className="p-4 flex items-center justify-center">
+                  <Spinner className="h-5 w-5 text-hg-on-surface-variant/50" />
+                </div>
+              ) : (
+                <div className="p-4 space-y-3">
+                  {streamLogs.map((log, index) => (
+                    <ParsedLogLine key={index} log={log} />
+                  ))}
+                </div>
+              )}
+              {!hasToolCalls && process.exitCode !== null && (
+                <div className="border-t border-hg-outline-variant/10 px-4 py-2 text-xs text-hg-on-surface-variant/70 flex justify-between">
+                  <span>Exit code: {process.exitCode}</span>
+                  {process.completedAt && (
+                    <span>Completed: {new Date(process.completedAt).toLocaleString()}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Collapsible Tool Calls / Details Section */}
           {hasToolCalls && (
             <div className="bg-hg-surface-container-low rounded-lg border border-hg-outline-variant/15 overflow-hidden mb-3">
               <button
-                onClick={() => setIsExpanded(!isExpanded)}
+                onClick={() => setIsExpanded(!isToolSectionExpanded)}
                 className="w-full px-4 py-2 flex items-center justify-between text-sm text-hg-on-surface-variant hover:bg-hg-surface-container-high/50 transition-colors cursor-pointer"
               >
                 <span className="flex items-center gap-2">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                   </svg>
-                  {parsedLogs.filter(l => l.parsed.type === 'tool_call').length} tool call(s)
+                  {toolLogs.filter(l => l.parsed.type === 'tool_call').length} tool call(s)
                 </span>
                 <svg
-                  className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                  className={`w-4 h-4 transition-transform ${isToolSectionExpanded ? 'rotate-180' : ''}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1676,7 +2088,7 @@ function ConversationTurnView({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
-              {isExpanded && (
+              {isToolSectionExpanded && (
                 <>
                   {isLoading ? (
                     <div className="p-4 flex items-center justify-center border-t border-hg-outline-variant/10">
@@ -1688,41 +2100,12 @@ function ConversationTurnView({
                       onScroll={handleScroll}
                       className="max-h-96 overflow-y-auto p-4 font-mono text-sm space-y-2 border-t border-hg-outline-variant/10"
                     >
-                      {parsedLogs.map((log, index) => (
+                      {toolLogs.map((log, index) => (
                         <ParsedLogLine key={index} log={log} />
                       ))}
                     </div>
                   )}
                 </>
-              )}
-              {process.exitCode !== null && (
-                <div className="border-t border-hg-outline-variant/10 px-4 py-2 text-xs text-hg-on-surface-variant/70 flex justify-between">
-                  <span>Exit code: {process.exitCode}</span>
-                  {process.completedAt && (
-                    <span>Completed: {new Date(process.completedAt).toLocaleString()}</span>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Non-tool logs (assistant text) when no tool calls */}
-          {!hasToolCalls && parsedLogs.length > 0 && (
-            <div className="bg-hg-surface-container-low rounded-lg border border-hg-outline-variant/15 overflow-hidden mb-3">
-              {isLoading ? (
-                <div className="p-4 flex items-center justify-center">
-                  <Spinner className="h-5 w-5 text-hg-on-surface-variant/50" />
-                </div>
-              ) : (
-                <div
-                  ref={containerRef}
-                  onScroll={handleScroll}
-                  className="max-h-96 overflow-y-auto p-4 font-mono text-sm space-y-2"
-                >
-                  {parsedLogs.map((log, index) => (
-                    <ParsedLogLine key={index} log={log} />
-                  ))}
-                </div>
               )}
               {process.exitCode !== null && (
                 <div className="border-t border-hg-outline-variant/10 px-4 py-2 text-xs text-hg-on-surface-variant/70 flex justify-between">

@@ -777,7 +777,7 @@ export class SchedulerService extends EventEmitter {
         const skillsService = new SkillsService(skillsDir);
         const validation = await skillsService.validate();
         if (validation.valid) {
-          await skillsService.injectSkills(task.connectorType as 'claude' | 'vibe');
+          await skillsService.injectSkills(task.connectorType);
           this.logger.info({ skillsDir, connector: task.connectorType, taskId: task.id }, 'Injected global skills for scheduled task');
         } else {
           this.logger.warn({ skillsDir, error: validation.error, taskId: task.id }, 'Skills directory invalid, skipping injection');

@@ -30,6 +30,11 @@ export interface SessionEvents {
 export type AvailabilityStatus = 'available' | 'not_installed' | 'not_configured' | 'error';
 
 /**
+ * Approval modes supported by connectors
+ */
+export type ConnectorApprovalMode = 'manual' | 'auto';
+
+/**
  * Information about connector availability
  */
 export interface AvailabilityInfo {
@@ -204,6 +209,16 @@ export interface BaseConnector {
    * Get setup instructions if the agent is not available
    */
   getSetupInstructions(): string;
+
+  /**
+   * Whether this connector supports the requested approval mode
+   */
+  supportsApprovalMode(mode: ConnectorApprovalMode): boolean;
+
+  /**
+   * Optional message to show when an approval mode is unsupported
+   */
+  getUnsupportedApprovalModeMessage(mode: ConnectorApprovalMode): string | null;
 }
 
 /**
@@ -229,6 +244,18 @@ export abstract class AbstractConnector implements BaseConnector {
 
   getSetupInstructions(): string {
     return `Install ${this.displayName} to use this connector.`;
+  }
+
+  supportsApprovalMode(_mode: ConnectorApprovalMode): boolean {
+    return true;
+  }
+
+  getUnsupportedApprovalModeMessage(mode: ConnectorApprovalMode): string | null {
+    if (this.supportsApprovalMode(mode)) {
+      return null;
+    }
+
+    return `${this.displayName} does not support ${mode} approval mode.`;
   }
 
   /**

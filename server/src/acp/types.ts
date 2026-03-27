@@ -490,6 +490,11 @@ export function parseAcpLine(line: string): AcpEvent | null {
       return parseClaudeStreamJsonToolResult(parsed, timestamp);
     }
 
+    // Codex CLI JSONL format (`codex exec --json`)
+    if (typeof parsed.type === 'string' && parsed.type.includes('.')) {
+      return parseCodexExecEvent(parsed, timestamp);
+    }
+
     // Direct event format (for types already matching AcpEventType)
     if (parsed.type) {
       return {
@@ -507,6 +512,206 @@ export function parseAcpLine(line: string): AcpEvent | null {
   } catch {
     // Not valid JSON, not an ACP event
     return null;
+  }
+}
+
+function parseCodexExecEvent(
+  parsed: Record<string, unknown>,
+  timestamp: number
+): AcpEvent | null {
+  const type = parsed.type as string;
+
+  switch (type) {
+    case 'thread.started':
+      if (typeof parsed.thread_id === 'string') {
+        return {
+          type: 'sessionStart',
+          sessionId: parsed.thread_id,
+          timestamp,
+        };
+      }
+      return null;
+
+    case 'turn.completed':
+      return {
+        type: 'done',
+        reason: 'completed',
+        result: extractCodexText(parsed) || undefined,
+        timestamp,
+      };
+
+    case 'turn.failed':
+      return {
+        type: 'done',
+        reason: 'error',
+        result: extractCodexText(parsed) || undefined,
+        timestamp,
+      };
+
+    case 'error':
+      return {
+        type: 'error',
+        message: extractCodexText(parsed) || 'Unknown Codex error',
+        timestamp,
+      };
+  }
+
+  if (type === 'item.started' || type === 'item.completed') {
+    return parseCodexItemEvent(parsed, timestamp);
+  }
+
+  if (type.startsWith('agent_message')) {
+    const text = extractCodexText(parsed);
+    if (!text) return null;
+    return {
+      type: 'message',
+      content: { type: 'text', text },
+      timestamp,
+    };
+  }
+
+  if (type.startsWith('agent_reasoning')) {
+    const text = extractCodexText(parsed);
+    if (!text) return null;
+    return {
+      type: 'thought',
+      content: { type: 'text', text },
+      timestamp,
+    };
+  }
+
+  if (type.startsWith('exec_command') || type.startsWith('patch_apply')) {
+    const codexToolId = getCodexToolId(parsed);
+    const status = getCodexToolStatus(type);
+    const toolName = type.startsWith('patch_apply') ? 'apply_patch' : 'shell';
+
+    if (status === 'running') {
+      return {
+        type: 'toolCall',
+        toolCall: {
+          id: codexToolId,
+          name: toolName,
+          input: extractCodexToolInput(parsed),
+        },
+        timestamp,
+      };
+    }
+
+    const output = extractCodexText(parsed)
+      || (type.startsWith('patch_apply') ? 'Patch applied' : undefined);
+
+    return {
+      type: 'toolUpdate',
+      update: {
+        id: codexToolId,
+        status,
+        output,
+        error: status === 'failed' ? output : undefined,
+      },
+      timestamp,
+    };
+  }
+
+  return null;
+}
+
+function parseCodexItemEvent(
+  parsed: Record<string, unknown>,
+  timestamp: number
+): AcpEvent | null {
+  const item = parsed.item;
+  if (typeof item !== 'object' || item === null) {
+    return null;
+  }
+
+  const codexItem = item as Record<string, unknown>;
+  const itemType = typeof codexItem.type === 'string' ? codexItem.type : null;
+  if (!itemType) {
+    return null;
+  }
+
+  switch (itemType) {
+    case 'agent_message': {
+      const text = extractCodexText(codexItem);
+      if (!text) return null;
+      return {
+        type: 'message',
+        content: { type: 'text', text },
+        timestamp,
+      };
+    }
+
+    case 'agent_reasoning':
+    case 'reasoning': {
+      const text = extractCodexText(codexItem);
+      if (!text) return null;
+      return {
+        type: 'thought',
+        content: { type: 'text', text },
+        timestamp,
+      };
+    }
+
+    case 'command_execution': {
+      const toolId = getCodexToolId(codexItem);
+      const status = getCodexItemExecutionStatus(parsed.type as string, codexItem);
+
+      if (status === 'running') {
+        return {
+          type: 'toolCall',
+          toolCall: {
+            id: toolId,
+            name: 'shell',
+            input: extractCodexToolInput(codexItem),
+          },
+          timestamp,
+        };
+      }
+
+      const output = extractCodexCommandOutput(codexItem);
+      return {
+        type: 'toolUpdate',
+        update: {
+          id: toolId,
+          status,
+          output,
+          error: status === 'failed' ? output : undefined,
+        },
+        timestamp,
+      };
+    }
+
+    case 'file_change': {
+      const toolId = getCodexToolId(codexItem);
+      const status = getCodexItemLifecycleStatus(parsed.type as string, codexItem);
+
+      if (status === 'running') {
+        return {
+          type: 'toolCall',
+          toolCall: {
+            id: toolId,
+            name: 'file_change',
+            input: extractCodexFileChangeInput(codexItem),
+          },
+          timestamp,
+        };
+      }
+
+      const output = summarizeCodexFileChanges(codexItem);
+      return {
+        type: 'toolUpdate',
+        update: {
+          id: toolId,
+          status,
+          output,
+          error: status === 'failed' ? output : undefined,
+        },
+        timestamp,
+      };
+    }
+
+    default:
+      return null;
   }
 }
 
@@ -739,6 +944,198 @@ function normalizeContentBlock(content: unknown): ContentBlock {
   }
 
   return { type: 'text', text: String(content) };
+}
+
+function extractCodexText(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => extractCodexText(item))
+      .filter(Boolean)
+      .join('');
+  }
+
+  if (typeof value !== 'object' || value === null) {
+    return '';
+  }
+
+  const record = value as Record<string, unknown>;
+
+  const directKeys = [
+    'text',
+    'delta',
+    'message',
+    'content',
+    'output',
+    'aggregated_output',
+    'stderr',
+    'stdout',
+    'error',
+  ] as const;
+
+  for (const key of directKeys) {
+    const candidate = record[key];
+    if (typeof candidate === 'string' && candidate) {
+      return candidate;
+    }
+  }
+
+  if (record.error && typeof record.error === 'object') {
+    const nested = extractCodexText(record.error);
+    if (nested) return nested;
+  }
+
+  if (record.last_message && typeof record.last_message === 'object') {
+    const nested = extractCodexText(record.last_message);
+    if (nested) return nested;
+  }
+
+  if (record.item && typeof record.item === 'object') {
+    const nested = extractCodexText(record.item);
+    if (nested) return nested;
+  }
+
+  if (record.patch && typeof record.patch === 'object') {
+    const nested = extractCodexText(record.patch);
+    if (nested) return nested;
+  }
+
+  return '';
+}
+
+function extractCodexToolInput(parsed: Record<string, unknown>): Record<string, unknown> {
+  const input: Record<string, unknown> = {};
+
+  if (typeof parsed.command === 'string') {
+    input.command = parsed.command;
+  }
+
+  if (Array.isArray(parsed.argv)) {
+    input.argv = parsed.argv;
+  }
+
+  if (typeof parsed.cwd === 'string') {
+    input.cwd = parsed.cwd;
+  }
+
+  if (typeof parsed.path === 'string') {
+    input.path = parsed.path;
+  }
+
+  if (typeof parsed.file_path === 'string') {
+    input.file_path = parsed.file_path;
+  }
+
+  if (parsed.patch) {
+    input.patch = parsed.patch;
+  }
+
+  return input;
+}
+
+function extractCodexFileChangeInput(parsed: Record<string, unknown>): Record<string, unknown> {
+  const changes = Array.isArray(parsed.changes) ? parsed.changes : [];
+  return changes.length > 0 ? { changes } : {};
+}
+
+function getCodexToolId(parsed: Record<string, unknown>): string {
+  const toolId = parsed.call_id || parsed.command_id || parsed.id || parsed.event_id;
+  return typeof toolId === 'string' ? toolId : 'codex-tool';
+}
+
+function getCodexToolStatus(type: string): ToolCallUpdate['status'] {
+  if (type.endsWith('.begin') || type.endsWith('.started')) {
+    return 'running';
+  }
+
+  if (type.endsWith('.failed')) {
+    return 'failed';
+  }
+
+  return 'completed';
+}
+
+function getCodexItemLifecycleStatus(
+  eventType: string,
+  item: Record<string, unknown>
+): ToolCallUpdate['status'] {
+  if (eventType === 'item.started' || item.status === 'in_progress') {
+    return 'running';
+  }
+
+  if (item.status === 'failed') {
+    return 'failed';
+  }
+
+  return 'completed';
+}
+
+function getCodexItemExecutionStatus(
+  eventType: string,
+  item: Record<string, unknown>
+): ToolCallUpdate['status'] {
+  if (eventType === 'item.started' || item.status === 'in_progress') {
+    return 'running';
+  }
+
+  const exitCode = typeof item.exit_code === 'number' ? item.exit_code : null;
+  if (item.status === 'failed' || (exitCode !== null && exitCode !== 0)) {
+    return 'failed';
+  }
+
+  return 'completed';
+}
+
+function extractCodexCommandOutput(item: Record<string, unknown>): string {
+  const output = extractCodexText(item);
+  if (output) {
+    return output;
+  }
+
+  const exitCode = typeof item.exit_code === 'number' ? item.exit_code : null;
+  if (exitCode !== null) {
+    return exitCode === 0
+      ? 'Command completed (exit code 0)'
+      : `Command failed (exit code ${exitCode})`;
+  }
+
+  return extractCodexCommandSummary(item) || 'Command completed';
+}
+
+function extractCodexCommandSummary(item: Record<string, unknown>): string {
+  if (typeof item.command === 'string' && item.command) {
+    return item.command;
+  }
+
+  if (Array.isArray(item.argv) && item.argv.length > 0) {
+    return item.argv.map((part) => String(part)).join(' ');
+  }
+
+  return '';
+}
+
+function summarizeCodexFileChanges(item: Record<string, unknown>): string {
+  if (!Array.isArray(item.changes) || item.changes.length === 0) {
+    return 'Files changed';
+  }
+
+  const lines = item.changes
+    .map((change) => {
+      if (typeof change !== 'object' || change === null) {
+        return null;
+      }
+
+      const record = change as Record<string, unknown>;
+      const path = typeof record.path === 'string' ? record.path : 'unknown file';
+      const kind = typeof record.kind === 'string' ? record.kind : 'update';
+      return `${kind}: ${path}`;
+    })
+    .filter((line): line is string => Boolean(line));
+
+  return lines.length > 0 ? lines.join('\n') : 'Files changed';
 }
 
 /**

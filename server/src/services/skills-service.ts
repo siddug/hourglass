@@ -30,11 +30,12 @@ function expandTilde(path: string): string {
  * Skills are organized in a flat structure:
  * - {globalDir}/<skill-name>/SKILL.md (or any structure)
  *
- * On injection, skills are symlinked to BOTH agents:
+ * On injection, skills are symlinked to supported agents:
  * - ~/.claude/commands/<skill-name> (symlink to skill directory)
  * - ~/.vibe/skills/<skill-name> (symlink to skill directory)
  *
  * This allows the same skills to be available in both Claude Code and Vibe.
+ * Connectors without a compatible skills directory (such as Codex CLI) are ignored.
  */
 export class SkillsService {
   private resolvedDir: string;
@@ -113,8 +114,12 @@ export class SkillsService {
    * Injects to BOTH Claude and Vibe regardless of which connector is being used.
    * Uses symlinks to keep updates synchronized.
    */
-  async injectSkills(_connector: 'claude' | 'vibe'): Promise<void> {
-    // Inject to both agents - skills are shared
+  async injectSkills(connector: string): Promise<void> {
+    if (connector !== 'claude' && connector !== 'vibe') {
+      return;
+    }
+
+    // Inject to both agents - skills are shared between these connectors
     await this.injectToAgent('claude');
     await this.injectToAgent('vibe');
   }

@@ -12,6 +12,7 @@ import type { ApprovalServiceMode } from '../../acp/approval-service.js';
 import { applyAgentModeToPrompt, applyFullPromptContext, type ProjectAgent } from '../../utils/prompt-utils.js';
 import { loadConfig } from '../../utils/config.js';
 import { SkillsService } from '../../services/skills-service.js';
+import type { BaseConnector } from '../../connectors/base.js';
 
 /**
  * Expand ~ to home directory
@@ -133,6 +134,21 @@ function resolvePromptContext(db: any, personalityId?: string, projectId?: strin
   }
 
   return { personality, project, projectAgents };
+}
+
+function validateApprovalModeSupport(
+  connector: BaseConnector,
+  approvalMode: ApprovalMode
+): { supported: boolean; message?: string } {
+  if (connector.supportsApprovalMode(approvalMode)) {
+    return { supported: true };
+  }
+
+  return {
+    supported: false,
+    message: connector.getUnsupportedApprovalModeMessage(approvalMode)
+      || `${connector.displayName} does not support ${approvalMode} approval mode.`,
+  };
 }
 
 export const sessionsRoutes: FastifyPluginAsync = async (server) => {
@@ -347,6 +363,13 @@ export const sessionsRoutes: FastifyPluginAsync = async (server) => {
       });
     }
 
+    const approvalValidation = validateApprovalModeSupport(connector, approvalMode);
+    if (!approvalValidation.supported) {
+      return reply.status(400).send({
+        error: approvalValidation.message,
+      });
+    }
+
     // Validate working directory exists
     if (!existsSync(workDir)) {
       return reply.status(400).send({
@@ -451,7 +474,7 @@ export const sessionsRoutes: FastifyPluginAsync = async (server) => {
         const skillsService = new SkillsService(skillsDir);
         const validation = await skillsService.validate();
         if (validation.valid) {
-          await skillsService.injectSkills(connectorName as 'claude' | 'vibe');
+          await skillsService.injectSkills(connectorName);
           server.log.info({ skillsDir, connector: connectorName }, 'Injected global skills');
         } else {
           server.log.warn({ skillsDir, error: validation.error }, 'Skills directory invalid, skipping injection');
@@ -822,6 +845,13 @@ export const sessionsRoutes: FastifyPluginAsync = async (server) => {
       // Get the approval mode and agent mode from the session for follow-up
       const approvalMode = session.approvalMode as ApprovalMode;
       const agentMode = session.agentMode as AgentMode;
+      const approvalValidation = validateApprovalModeSupport(connector, approvalMode);
+
+      if (!approvalValidation.supported) {
+        return reply.status(400).send({
+          error: approvalValidation.message,
+        });
+      }
 
       // Apply agent mode to prompt (plan mode prepends planning instructions)
       const effectivePrompt = applyAgentModeToPrompt(prompt, agentMode);
@@ -1143,6 +1173,13 @@ export const sessionsRoutes: FastifyPluginAsync = async (server) => {
         const now = new Date();
         const approvalMode = session.approvalMode as ApprovalMode;
         const agentMode = session.agentMode as AgentMode;
+        const approvalValidation = validateApprovalModeSupport(connector, approvalMode);
+
+        if (!approvalValidation.supported) {
+          return reply.status(400).send({
+            error: approvalValidation.message,
+          });
+        }
 
         // Resolve personality and project context for prompt injection
         const triagePromptContext = resolvePromptContext(db, session.personalityId || undefined, session.projectId || undefined);
@@ -1539,6 +1576,20 @@ export const sessionsRoutes: FastifyPluginAsync = async (server) => {
     if (!session) {
       return reply.status(404).send({
         error: 'Session not found',
+      });
+    }
+
+    const connector = registry.get(session.connectorType);
+    if (!connector) {
+      return reply.status(400).send({
+        error: `Connector ${session.connectorType} no longer available`,
+      });
+    }
+
+    const approvalValidation = validateApprovalModeSupport(connector, newMode);
+    if (!approvalValidation.supported) {
+      return reply.status(400).send({
+        error: approvalValidation.message,
       });
     }
 

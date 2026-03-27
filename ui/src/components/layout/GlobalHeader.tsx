@@ -3,6 +3,7 @@
 import { useTheme } from '@/contexts/ThemeContext';
 import { useViewMode, type ViewMode } from '@/contexts/ViewModeContext';
 import { useServer } from '@/contexts/ServerContext';
+import { useCommandCenter } from '@/contexts/CommandCenterContext';
 
 const NAV_TABS: { id: ViewMode; label: string }[] = [
   { id: 'kanban', label: 'Kanban' },
@@ -15,6 +16,7 @@ export function GlobalHeader() {
   const { theme, toggleTheme } = useTheme();
   const { viewMode, setViewMode } = useViewMode();
   const { activeServer } = useServer();
+  const { openPalette } = useCommandCenter();
 
   return (
     <header className="fixed top-0 z-50 w-full h-14 flex items-center justify-between px-6 bg-hg-header-bg border-b border-hg-outline-variant/20">
@@ -42,6 +44,22 @@ export function GlobalHeader() {
             </button>
           ))}
         </nav>
+
+        <button
+          onClick={openPalette}
+          className="hidden lg:flex items-center gap-3 min-w-[280px] rounded-xl border border-hg-outline-variant/25 bg-hg-surface-container-low px-3 py-2 text-left text-sm text-hg-on-surface-variant transition-colors hover:border-hg-primary/30 hover:bg-hg-surface-container cursor-pointer"
+          title="Search actions and sessions"
+        >
+          <svg className="w-4 h-4 shrink-0 text-hg-on-surface-variant/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <span className="flex-1 truncate">Search actions and sessions...</span>
+          <span className="inline-flex items-center gap-1 rounded-md border border-hg-outline-variant/30 bg-hg-surface-container px-2 py-0.5 text-[11px] font-medium text-hg-on-surface-variant">
+            <span className="hidden xl:inline">Cmd</span>
+            <span className="xl:hidden">⌘</span>
+            <span>K</span>
+          </span>
+        </button>
       </div>
 
       {/* Right: Server badge, theme toggle, avatar */}

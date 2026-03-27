@@ -25,6 +25,8 @@ interface ScheduledTaskCreateModalProps {
   onCreated: () => void;
 }
 
+const connectorSupportsManualApproval = (connectorName: string) => connectorName !== 'codex';
+
 export function ScheduledTaskCreateModal({ open, onClose, onCreated }: ScheduledTaskCreateModalProps) {
   // Form state
   const [name, setName] = useState('');
@@ -71,13 +73,21 @@ export function ScheduledTaskCreateModal({ open, onClose, onCreated }: Scheduled
     }
   }, [open]);
 
+  useEffect(() => {
+    if (connector && approvalMode === 'manual' && !connectorSupportsManualApproval(connector)) {
+      setApprovalMode('auto');
+    }
+  }, [approvalMode, connector]);
+
   const loadConnectors = async () => {
     try {
       const response = await getConnectors();
-      const availableConnectors = response.connectors.filter(c => c.status === 'available');
-      setConnectors(availableConnectors);
-      if (availableConnectors.length > 0 && !connector) {
-        setConnector(availableConnectors[0].name);
+      setConnectors(response.connectors);
+      if (!connector && response.connectors.length > 0) {
+        const preferredConnector = response.connectors.find((c) => c.name === 'codex' && c.status === 'available')
+          || response.connectors.find((c) => c.status === 'available')
+          || response.connectors[0];
+        setConnector(preferredConnector.name);
       }
     } catch (err) {
       console.error('Failed to load connectors:', err);
@@ -215,6 +225,8 @@ export function ScheduledTaskCreateModal({ open, onClose, onCreated }: Scheduled
     { label: 'Every Sunday', value: '0 0 * * 0' },
     { label: 'First of month', value: '0 0 1 * *' },
   ];
+  const manualApprovalSupported = connectorSupportsManualApproval(connector);
+  const selectedConnector = connectors.find((c) => c.name === connector) || null;
 
   return (
     <Dialog open={open} onClose={onClose} title="Create Scheduled Task" className="max-w-2xl w-full">
@@ -261,9 +273,19 @@ export function ScheduledTaskCreateModal({ open, onClose, onCreated }: Scheduled
             <Dropdown
               value={connector}
               onChange={setConnector}
-              options={connectors.map((c) => ({ value: c.name, label: c.displayName }))}
+              options={connectors.map((c) => ({
+                value: c.name,
+                label: c.status === 'available'
+                  ? c.displayName
+                  : `${c.displayName} (${c.status.replace(/_/g, ' ')})`,
+              }))}
               placeholder="Select connector..."
             />
+            {selectedConnector?.message && (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {selectedConnector.message}
+              </p>
+            )}
           </div>
 
           <div>
@@ -466,11 +488,13 @@ export function ScheduledTaskCreateModal({ open, onClose, onCreated }: Scheduled
               onChange={(v) => setApprovalMode(v as ApprovalMode)}
               options={[
                 { value: 'auto', label: 'Auto-approve' },
-                { value: 'manual', label: 'Manual approval' },
+                ...(manualApprovalSupported ? [{ value: 'manual', label: 'Manual approval' }] : []),
               ]}
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {approvalMode === 'auto'
+              {!manualApprovalSupported
+                ? 'Codex CLI currently supports auto approval only in Hourglass'
+                : approvalMode === 'auto'
                 ? 'All tool calls will be auto-approved (recommended for scheduled tasks)'
                 : 'Tool calls will require manual approval'}
             </p>

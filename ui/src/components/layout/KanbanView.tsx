@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   updateSessionStatus,
   getPersonalities,
@@ -15,6 +15,7 @@ import { usePaginatedSessions } from '@/hooks/usePaginatedSessions';
 import { Spinner } from '@/components/ui';
 import { SessionCreateModal } from '@/components/session/SessionCreateModal';
 import { SessionDetailModal } from '@/components/session/SessionDetailModal';
+import { useCommandCenter, type OpenSessionTarget } from '@/contexts/CommandCenterContext';
 
 const COLUMNS: { status: SessionStatus; title: string; badgeBg: string }[] = [
   { status: 'triage', title: 'Triage', badgeBg: 'bg-hg-surface-container-high text-hg-on-surface-variant' },
@@ -32,9 +33,12 @@ interface KanbanViewProps {
 }
 
 export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewProps) {
+  const { registerSurface } = useCommandCenter();
   const { columns, loadMore, refresh, smartRefresh, moveSessionOptimistically } = usePaginatedSessions();
   const [createModalOpen, setCreateModalOpen] = useState(initialCreateOpen ?? false);
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(initialSessionId ?? null);
+  const [selectedSessionTarget, setSelectedSessionTarget] = useState<OpenSessionTarget | null>(
+    initialSessionId ? { sessionId: initialSessionId } : null
+  );
 
   // Personality & Project lookup maps for card display
   const [personalityMap, setPersonalityMap] = useState<Record<string, Personality>>({});
@@ -70,35 +74,26 @@ export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewPr
     fetchLookups();
   }, []);
 
-  // Sync state with props on initial mount (for direct URL navigation/reload)
-  useEffect(() => {
-    setSelectedSessionId(initialSessionId ?? null);
-  }, [initialSessionId]);
-
-  useEffect(() => {
-    setCreateModalOpen(initialCreateOpen ?? false);
-  }, [initialCreateOpen]);
-
   // URL update helpers - use history API to avoid full page navigation
-  const openSession = (sessionId: string) => {
-    setSelectedSessionId(sessionId);
-    window.history.pushState(null, '', `/kanban/${sessionId}`);
-  };
+  const openSession = useCallback((target: OpenSessionTarget) => {
+    setSelectedSessionTarget(target);
+    window.history.pushState(null, '', `/kanban/${target.sessionId}`);
+  }, []);
 
-  const closeSession = () => {
-    setSelectedSessionId(null);
+  const closeSession = useCallback(() => {
+    setSelectedSessionTarget(null);
     window.history.pushState(null, '', '/kanban');
-  };
+  }, []);
 
-  const openCreateModal = () => {
+  const openCreateModal = useCallback(() => {
     setCreateModalOpen(true);
     window.history.pushState(null, '', '/kanban/new');
-  };
+  }, []);
 
-  const closeCreateModal = () => {
+  const closeCreateModal = useCallback(() => {
     setCreateModalOpen(false);
     window.history.pushState(null, '', '/kanban');
-  };
+  }, []);
 
   // Drag state
   const [draggedSession, setDraggedSession] = useState<Session | null>(null);
@@ -109,6 +104,31 @@ export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewPr
     const interval = setInterval(smartRefresh, 2000);
     return () => clearInterval(interval);
   }, [smartRefresh]);
+
+  useEffect(() => {
+    registerSurface({
+      viewMode: 'kanban',
+      openNewSession: openCreateModal,
+      openSession,
+      closeModalSession: createModalOpen
+        ? closeCreateModal
+        : selectedSessionTarget
+          ? closeSession
+          : undefined,
+      refresh: smartRefresh,
+    });
+
+    return () => registerSurface(null);
+  }, [
+    closeCreateModal,
+    closeSession,
+    createModalOpen,
+    openCreateModal,
+    openSession,
+    registerSurface,
+    selectedSessionTarget,
+    smartRefresh,
+  ]);
 
   const handleDragStart = (e: React.DragEvent, session: Session) => {
     setDraggedSession(session);
@@ -232,7 +252,7 @@ export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewPr
                   isDragOver={dragOverColumn === column.status}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
-                  onCardClick={openSession}
+                  onCardClick={(sessionId) => openSession({ sessionId })}
                   draggedSessionId={draggedSession?.id ?? null}
                   onCreateClick={openCreateModal}
                   onBulkMove={handleBulkMove}
@@ -254,10 +274,11 @@ export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewPr
       />
 
       {/* Detail Modal */}
-      {selectedSessionId && (
+      {selectedSessionTarget && (
         <SessionDetailModal
-          sessionId={selectedSessionId}
-          open={!!selectedSessionId}
+          sessionId={selectedSessionTarget.sessionId}
+          initialTab={selectedSessionTarget.tab}
+          open={!!selectedSessionTarget}
           onClose={closeSession}
         />
       )}
@@ -533,6 +554,17 @@ function CategoryIcon({ type }: { type: string }) {
     );
   }
 
+  if (lowerType === 'codex' || lowerType === 'code') {
+    return (
+      <img
+        src="/openai.svg"
+        alt="OpenAI"
+        title="OpenAI"
+        className="w-4 h-4 object-contain"
+      />
+    );
+  }
+
   // Fallback for unknown types
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-hg-surface-container-high text-hg-on-surface-variant">
@@ -750,7 +782,9 @@ interface WorkDirSwitcherProps {
 
 function WorkDirSwitcher({ workDirs, value, onChange }: WorkDirSwitcherProps) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const ref = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -762,6 +796,12 @@ function WorkDirSwitcher({ workDirs, value, onChange }: WorkDirSwitcherProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (open) {
+      searchInputRef.current?.focus();
+    }
+  }, [open]);
+
   // Show shortened path for display
   const getShortPath = (path: string) => {
     const parts = path.split('/').filter(Boolean);
@@ -770,11 +810,23 @@ function WorkDirSwitcher({ workDirs, value, onChange }: WorkDirSwitcherProps) {
   };
 
   const selectedLabel = value ? getShortPath(value) : 'All Directories';
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredWorkDirs = normalizedSearch
+    ? workDirs.filter((workDir) => workDir.toLowerCase().includes(normalizedSearch))
+    : workDirs;
 
   return (
     <div className="min-w-[140px] md:min-w-[180px]" ref={ref}>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          setOpen((current) => {
+            const next = !current;
+            if (!next) {
+              setSearch('');
+            }
+            return next;
+          });
+        }}
         className="w-full flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 rounded-lg border border-hg-outline-variant/30 hover:bg-hg-surface-container-high transition-colors text-xs md:text-sm cursor-pointer text-hg-on-surface"
       >
         <svg className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0 text-hg-on-surface-variant" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -792,44 +844,61 @@ function WorkDirSwitcher({ workDirs, value, onChange }: WorkDirSwitcherProps) {
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 bg-hg-surface-container border border-hg-outline-variant/30 rounded-lg shadow-xl z-[100] overflow-hidden min-w-[200px] max-w-[350px] max-h-[300px] overflow-y-auto">
-          <button
-            onClick={() => { onChange(''); setOpen(false); }}
-            className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors cursor-pointer ${
-              !value
-                ? 'bg-hg-primary/10 text-hg-primary'
-                : 'text-hg-on-surface hover:bg-hg-surface-container-high'
-            }`}
-          >
-            <span className="flex-1 truncate">All Directories</span>
-            {!value && (
-              <svg className="w-4 h-4 flex-shrink-0 text-hg-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            )}
-          </button>
-          {workDirs.map((workDir) => (
+        <div className="absolute top-full left-0 mt-1 bg-hg-surface-container border border-hg-outline-variant/30 rounded-lg shadow-xl z-[100] overflow-hidden min-w-[200px] max-w-[350px] max-h-[300px]">
+          <div className="p-2 border-b border-hg-outline-variant/20">
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              placeholder="Search directories..."
+              className="w-full px-3 py-2 text-sm rounded-md border border-hg-outline-variant/30 bg-hg-surface-container-low text-hg-on-surface placeholder:text-hg-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-hg-primary/40"
+            />
+          </div>
+          <div className="max-h-[244px] overflow-y-auto">
             <button
-              key={workDir}
-              onClick={() => { onChange(workDir); setOpen(false); }}
+              onClick={() => { onChange(''); setOpen(false); setSearch(''); }}
               className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors cursor-pointer ${
-                value === workDir
+                !value
                   ? 'bg-hg-primary/10 text-hg-primary'
                   : 'text-hg-on-surface hover:bg-hg-surface-container-high'
               }`}
-              title={workDir}
             >
-              <span className="flex-1 truncate">{getShortPath(workDir)}</span>
-              {value === workDir && (
+              <span className="flex-1 truncate">All Directories</span>
+              {!value && (
                 <svg className="w-4 h-4 flex-shrink-0 text-hg-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               )}
             </button>
-          ))}
+            {filteredWorkDirs.map((workDir) => (
+              <button
+                key={workDir}
+                onClick={() => { onChange(workDir); setOpen(false); setSearch(''); }}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors cursor-pointer ${
+                  value === workDir
+                    ? 'bg-hg-primary/10 text-hg-primary'
+                    : 'text-hg-on-surface hover:bg-hg-surface-container-high'
+                }`}
+                title={workDir}
+              >
+                <span className="flex-1 truncate">{getShortPath(workDir)}</span>
+                {value === workDir && (
+                  <svg className="w-4 h-4 flex-shrink-0 text-hg-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </button>
+            ))}
+            {filteredWorkDirs.length === 0 && (
+              <div className="px-3 py-4 text-sm text-hg-on-surface-variant text-center">
+                No directories match &quot;{search}&quot;
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
   );
 }
-

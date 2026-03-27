@@ -170,6 +170,11 @@ export function ProviderBadge({ provider, className = '' }: ProviderBadgeProps) 
       text: 'text-hg-tertiary',
       label: 'Mistral Vibe',
     },
+    codex: {
+      bg: 'bg-teal-500/10',
+      text: 'text-teal-600 dark:text-teal-400',
+      label: 'Codex CLI',
+    },
   };
 
   const style = providerStyles[provider] || {
@@ -207,6 +212,13 @@ export function AILogo({ provider, className = '' }: AILogoProps) {
         return (
           <div className={`w-6 h-6 flex items-center justify-center ${className}`}>
             <img src="/mistral.svg" alt="Mistral Vibe" className="w-full h-full object-contain" />
+          </div>
+        );
+      case 'codex':
+      case 'code':
+        return (
+          <div className={`w-6 h-6 flex items-center justify-center ${className}`}>
+            <img src="/openai.svg" alt="OpenAI" className="w-full h-full object-contain" />
           </div>
         );
       default:

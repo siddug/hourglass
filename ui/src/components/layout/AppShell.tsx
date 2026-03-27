@@ -1,6 +1,8 @@
 'use client';
 
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
+import { CommandPalette } from './CommandPalette';
+import { CommandCenterProvider, useCommandCenter } from '@/contexts/CommandCenterContext';
 import { useViewMode } from '@/contexts/ViewModeContext';
 import { GlobalHeader } from './GlobalHeader';
 import { Sidebar } from './Sidebar';
@@ -13,8 +15,71 @@ interface AppShellProps {
   children: ReactNode;
 }
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children: _children }: AppShellProps) {
+  void _children;
+  return (
+    <CommandCenterProvider>
+      <AppShellContent />
+    </CommandCenterProvider>
+  );
+}
+
+function AppShellContent() {
   const { viewMode } = useViewMode();
+  const {
+    paletteOpen,
+    openPalette,
+    closePalette,
+    requestNewSession,
+    requestCloseModalSession,
+    isModalSessionOpen,
+  } = useCommandCenter();
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.isComposing) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      const isPrimaryShortcut = event.metaKey || event.ctrlKey;
+
+      if (isPrimaryShortcut && key === 'k') {
+        event.preventDefault();
+        openPalette();
+        return;
+      }
+
+      if (isPrimaryShortcut && key === 'n') {
+        event.preventDefault();
+        requestNewSession();
+        return;
+      }
+
+      if (event.key === 'Escape') {
+        if (paletteOpen) {
+          event.preventDefault();
+          closePalette();
+          return;
+        }
+
+        if (isModalSessionOpen) {
+          event.preventDefault();
+          requestCloseModalSession();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    closePalette,
+    isModalSessionOpen,
+    openPalette,
+    paletteOpen,
+    requestCloseModalSession,
+    requestNewSession,
+  ]);
 
   const renderView = () => {
     switch (viewMode) {
@@ -42,6 +107,7 @@ export function AppShell({ children }: AppShellProps) {
       <main className="ml-64 mt-14 h-[calc(100vh-3.5rem)] overflow-auto bg-hg-surface-dim">
         {renderView()}
       </main>
+      {paletteOpen ? <CommandPalette /> : null}
     </div>
   );
 }

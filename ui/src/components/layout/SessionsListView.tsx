@@ -2,16 +2,18 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useServer } from '@/contexts/ServerContext';
+import { useCommandCenter, type OpenSessionTarget } from '@/contexts/CommandCenterContext';
 import { getSessions, type Session } from '@/lib/api';
-import { Spinner, StatusBadge } from '@/components/ui';
+import { Spinner } from '@/components/ui';
 import { SessionDetailView } from '@/components/session/SessionDetailView';
 import { SessionCreateModal } from '@/components/session/SessionCreateModal';
 
 export function SessionsListView() {
+  const { registerSurface } = useCommandCenter();
   const { activeServer } = useServer();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedSessionTarget, setSelectedSessionTarget] = useState<OpenSessionTarget | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -33,6 +35,22 @@ export function SessionsListView() {
     const interval = setInterval(fetchSessions, 5000);
     return () => clearInterval(interval);
   }, [fetchSessions, activeServer?.id]);
+
+  const openSession = useCallback((target: OpenSessionTarget) => {
+    setSelectedSessionTarget(target);
+  }, []);
+
+  useEffect(() => {
+    registerSurface({
+      viewMode: 'sessions',
+      openNewSession: () => setCreateModalOpen(true),
+      openSession,
+      closeModalSession: createModalOpen ? () => setCreateModalOpen(false) : undefined,
+      refresh: fetchSessions,
+    });
+
+    return () => registerSurface(null);
+  }, [createModalOpen, fetchSessions, openSession, registerSurface]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -110,9 +128,9 @@ export function SessionsListView() {
                 {sortedSessions.map((session) => (
                   <button
                     key={session.id}
-                    onClick={() => setSelectedSessionId(session.id)}
+                    onClick={() => openSession({ sessionId: session.id })}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-sm transition-colors cursor-pointer ${
-                      selectedSessionId === session.id
+                      selectedSessionTarget?.sessionId === session.id
                         ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                         : 'hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
@@ -149,12 +167,13 @@ export function SessionsListView() {
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-hidden flex flex-col min-w-0">
-        {selectedSessionId ? (
+        {selectedSessionTarget ? (
           <SessionDetailView
-            sessionId={selectedSessionId}
-            onNavigateHome={() => setSelectedSessionId(null)}
+            sessionId={selectedSessionTarget.sessionId}
+            initialTab={selectedSessionTarget.tab}
+            onNavigateHome={() => setSelectedSessionTarget(null)}
             showCloseButton
-            onClose={() => setSelectedSessionId(null)}
+            onClose={() => setSelectedSessionTarget(null)}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center p-6">
@@ -175,7 +194,7 @@ export function SessionsListView() {
         onClose={() => setCreateModalOpen(false)}
         onCreated={(sessionId) => {
           if (sessionId) {
-            setSelectedSessionId(sessionId);
+            setSelectedSessionTarget({ sessionId });
           }
           fetchSessions();
         }}

@@ -2,11 +2,11 @@
 /**
  * hourglass CLI entry point
  *
- * Starts the hourglass server with default configuration and Claude connector.
+ * Starts the hourglass server with default configuration and bundled connectors.
  */
 
 import { randomBytes } from 'node:crypto';
-import { VibeServer, ClaudeConnector, VibeConnector } from '../index.js';
+import { VibeServer, ClaudeConnector, VibeConnector, CodexConnector } from '../index.js';
 import { loadConfig, saveConfig, getConfigPath } from '../utils/config.js';
 import { isSandboxSupported } from '../sandbox/index.js';
 
@@ -66,6 +66,10 @@ async function main() {
     sandbox: sandboxConfig,
   });
 
+  const codex = new CodexConnector({
+    sandbox: sandboxConfig,
+  });
+
   // We need to start the server first to access the registry
   await server.listen();
 
@@ -73,6 +77,8 @@ async function main() {
   if (server.registry) {
     server.registry.register(claude);
     server.registry.register(vibe);
+    server.registry.register(codex);
+    server.registry.setDefault('codex');
     console.log('Registered connectors:', server.registry.names());
   }
 

@@ -36,6 +36,8 @@ interface SessionCreateFormProps {
   initialWorkDir?: string;
 }
 
+const connectorSupportsManualApproval = (connectorName: string) => connectorName !== 'codex';
+
 export function SessionCreateForm({
   onSessionCreated,
   onScheduledTaskCreated,
@@ -146,9 +148,11 @@ export function SessionCreateForm({
       const connectorsRes = await getConnectors();
       setConnectors(connectorsRes.connectors);
       const available = connectorsRes.connectors.filter((c) => c.status === 'available');
-      if (available.length > 0 && !connector) {
-        const claude = available.find((c) => c.name === 'claude');
-        setConnector(claude ? claude.name : available[0].name);
+      if (!connector && connectorsRes.connectors.length > 0) {
+        const preferred = available.find((c) => c.name === 'codex')
+          || available[0]
+          || connectorsRes.connectors[0];
+        setConnector(preferred.name);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch connectors');
@@ -191,6 +195,12 @@ export function SessionCreateForm({
       setLoading(false);
     }
   }, [fetchConnectors, fetchSkillsConfig, fetchPersonalitiesAndProjects, servers.length]);
+
+  useEffect(() => {
+    if (connector && approvalMode === 'manual' && !connectorSupportsManualApproval(connector)) {
+      setApprovalMode('auto');
+    }
+  }, [approvalMode, connector]);
 
   const nameToSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
@@ -370,7 +380,8 @@ export function SessionCreateForm({
     );
   }
 
-  const availableConnectors = connectors.filter((c) => c.status === 'available');
+  const selectedConnector = connectors.find((c) => c.name === connector) || null;
+  const manualApprovalSupported = connectorSupportsManualApproval(connector);
 
   // Main form — bento grid layout
   return (
@@ -414,7 +425,7 @@ export function SessionCreateForm({
               value={prompt}
               onChange={setPrompt}
               onSubmit={() => handleSubmit(true)}
-              disabled={!connector || availableConnectors.length === 0}
+              disabled={!connector}
               submitting={submitting || submittingSchedule}
               images={images}
               onImagesChange={setImages}
@@ -428,16 +439,21 @@ export function SessionCreateForm({
             <div className="rounded-xl border border-hg-outline-variant/30 bg-hg-surface-container-low p-5">
               <span className="font-label text-hg-on-surface-variant mb-3 block">Preferred Agentic Connector</span>
               <div className="space-y-2">
-                {availableConnectors.map((c) => (
+                {connectors.map((c) => (
                   <button
                     key={c.name}
                     type="button"
-                    onClick={() => setConnector(c.name)}
+                    onClick={() => {
+                      setConnector(c.name);
+                      if (!connectorSupportsManualApproval(c.name)) {
+                        setApprovalMode('auto');
+                      }
+                    }}
                     className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer ${
                       connector === c.name
                         ? 'border-hg-primary/40 bg-hg-primary/5'
                         : 'border-hg-outline-variant/20 hover:border-hg-outline-variant/40'
-                    }`}
+                    } ${c.status === 'available' ? '' : 'opacity-85'}`}
                   >
                     <AILogo provider={c.name} className="w-6 h-6" />
                     <div className="flex-1 text-left">
@@ -445,19 +461,31 @@ export function SessionCreateForm({
                       {c.version && (
                         <div className="text-[10px] text-hg-on-surface-variant">{c.version}</div>
                       )}
+                      {c.message && (
+                        <div className="text-[10px] text-hg-on-surface-variant/80 mt-0.5">
+                          {c.message}
+                        </div>
+                      )}
                     </div>
                     <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                       c.status === 'available'
                         ? 'bg-emerald-500/10 text-emerald-500'
-                        : 'bg-hg-surface-container-high text-hg-on-surface-variant'
+                        : c.status === 'not_configured'
+                          ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                          : 'bg-hg-surface-container-high text-hg-on-surface-variant'
                     }`}>
-                      {c.status === 'available' ? 'Online' : 'Offline'}
+                      {c.status === 'available' ? 'Online' : c.status.replace(/_/g, ' ')}
                     </span>
                   </button>
                 ))}
-                {availableConnectors.length === 0 && (
+                {connectors.length === 0 && (
                   <p className="text-xs text-hg-on-surface-variant/60 text-center py-4">
-                    No connectors available
+                    No connectors found
+                  </p>
+                )}
+                {selectedConnector && selectedConnector.status !== 'available' && (
+                  <p className="text-xs text-hg-on-surface-variant/70 pt-1">
+                    {selectedConnector.message || `${selectedConnector.displayName} is currently ${selectedConnector.status.replace(/_/g, ' ')}.`}
                   </p>
                 )}
               </div>
@@ -673,12 +701,17 @@ export function SessionCreateForm({
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setApprovalMode('manual')}
+                  onClick={() => {
+                    if (manualApprovalSupported) {
+                      setApprovalMode('manual');
+                    }
+                  }}
+                  disabled={!manualApprovalSupported}
                   className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
                     approvalMode === 'manual'
                       ? 'border-hg-primary/40 bg-hg-primary/10 text-hg-primary'
                       : 'border-hg-outline-variant/30 text-hg-on-surface-variant hover:border-hg-outline-variant'
-                  }`}
+                  } ${!manualApprovalSupported ? 'opacity-50 cursor-not-allowed hover:border-hg-outline-variant/30' : ''}`}
                 >
                   Manual
                 </button>
@@ -694,6 +727,11 @@ export function SessionCreateForm({
                   Auto
                 </button>
               </div>
+              {!manualApprovalSupported && (
+                <p className="mt-2 text-[11px] text-hg-on-surface-variant/70">
+                  Codex CLI currently runs through Hourglass in auto approval mode only.
+                </p>
+              )}
             </div>
 
             {/* Advanced Options Toggle */}

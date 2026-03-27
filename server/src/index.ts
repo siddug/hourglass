@@ -6,11 +6,12 @@
  *
  * @example
  * ```typescript
- * import { VibeServer, ClaudeConnector, VibeConnector } from '@hourglass/server';
+ * import { VibeServer, ClaudeConnector, VibeConnector, CodexConnector } from '@hourglass/server';
  *
  * const server = new VibeServer({ port: 3000 });
  * server.registerConnector('claude', new ClaudeConnector());
  * server.registerConnector('vibe', new VibeConnector());
+ * server.registerConnector('codex', new CodexConnector());
  * await server.listen();
  * ```
  */
@@ -188,6 +189,12 @@ export {
   createVibeConnector,
   type VibeConnectorConfig,
 } from './connectors/vibe.js';
+
+export {
+  CodexConnector,
+  createCodexConnector,
+  type CodexConnectorConfig,
+} from './connectors/codex.js';
 
 export {
   ConnectorRegistry,

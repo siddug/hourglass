@@ -14,15 +14,15 @@ function getConnectorIcon(connectorName: string) {
 }
 
 export function ConnectorSelector({ connectors, value, onChange }: ConnectorSelectorProps) {
-  const availableConnectors = connectors.filter((c) => c.status === 'available');
-
-  const options = availableConnectors.length > 0
-    ? availableConnectors.map((connector) => ({
+  const options = connectors.length > 0
+    ? connectors.map((connector) => ({
         value: connector.name,
-        label: connector.displayName,
+        label: connector.status === 'available'
+          ? connector.displayName
+          : `${connector.displayName} (${connector.status.replace(/_/g, ' ')})`,
         icon: getConnectorIcon(connector.name),
       }))
-    : [{ value: '', label: 'No connectors available' }];
+    : [{ value: '', label: 'No connectors found' }];
 
   return (
     <div className="w-full">
@@ -31,7 +31,7 @@ export function ConnectorSelector({ connectors, value, onChange }: ConnectorSele
         value={value}
         onChange={onChange}
         options={options}
-        disabled={availableConnectors.length === 0}
+        disabled={connectors.length === 0}
         className="w-full"
       />
     </div>

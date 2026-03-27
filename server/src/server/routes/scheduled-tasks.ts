@@ -3,9 +3,10 @@ import { z } from 'zod';
 import { eq, desc, sql } from 'drizzle-orm';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { scheduledTasks, sessions, apiKeys, type ScheduleType } from '../../db/schema.js';
+import { scheduledTasks, sessions, apiKeys, type ScheduleType, type ApprovalMode } from '../../db/schema.js';
 import type { SchedulerService } from '../../scheduler/index.js';
 import { generateSessionNameWithFallback } from '../../utils/session-name-generator.js';
+import type { BaseConnector } from '../../connectors/base.js';
 
 /**
  * Expand ~ to home directory
@@ -18,6 +19,21 @@ function expandTilde(path: string): string {
     return homedir();
   }
   return path;
+}
+
+function validateApprovalModeSupport(
+  connector: BaseConnector,
+  approvalMode: ApprovalMode
+): { supported: boolean; message?: string } {
+  if (connector.supportsApprovalMode(approvalMode)) {
+    return { supported: true };
+  }
+
+  return {
+    supported: false,
+    message: connector.getUnsupportedApprovalModeMessage(approvalMode)
+      || `${connector.displayName} does not support ${approvalMode} approval mode.`,
+  };
 }
 
 /**
@@ -247,6 +263,13 @@ export const scheduledTasksRoutes = (scheduler: SchedulerService): FastifyPlugin
       });
     }
 
+    const approvalValidation = validateApprovalModeSupport(connectorInstance, body.data.approvalMode);
+    if (!approvalValidation.supported) {
+      return reply.status(400).send({
+        error: approvalValidation.message,
+      });
+    }
+
     // Validate working directory exists
     if (!existsSync(workDir)) {
       return reply.status(400).send({
@@ -314,12 +337,23 @@ export const scheduledTasksRoutes = (scheduler: SchedulerService): FastifyPlugin
     const { connector, workDir: rawWorkDir, runAt, ...rest } = body.data;
 
     // Validate connector if being updated
+    const connectorInstance = connector ? registry.get(connector) : registry.get(task.connectorType);
+
     if (connector) {
-      const connectorInstance = registry.get(connector);
       if (!connectorInstance) {
         return reply.status(400).send({
           error: `Unknown connector: ${connector}`,
           available: registry.names(),
+        });
+      }
+    }
+
+    if (connectorInstance) {
+      const effectiveApprovalMode = body.data.approvalMode ?? (task.approvalMode as ApprovalMode);
+      const approvalValidation = validateApprovalModeSupport(connectorInstance, effectiveApprovalMode);
+      if (!approvalValidation.supported) {
+        return reply.status(400).send({
+          error: approvalValidation.message,
         });
       }
     }
