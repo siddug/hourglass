@@ -228,8 +228,10 @@ interface UserAvatarProps {
 
 export function UserAvatar({ className = '' }: UserAvatarProps) {
   return (
-    <div className={`w-6 h-6 flex items-center justify-center ${className}`}>
-      <div className="w-5 h-5 rounded-full bg-hg-surface-container-high" />
+    <div className={`w-6 h-6 flex items-center justify-center rounded-full bg-hg-primary/15 ${className}`}>
+      <svg className="w-3.5 h-3.5 text-hg-primary" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+      </svg>
     </div>
   );
 }

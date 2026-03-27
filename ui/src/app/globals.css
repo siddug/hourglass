@@ -48,33 +48,33 @@
 }
 
 [data-theme="dark"] {
-  --background: #0b1120;
-  --foreground: #e2e8f0;
-  --sidebar-bg: #0f1729;
-  --sidebar-border: #1e293b;
-  --card-bg: #131c2e;
-  --card-border: #1e293b;
-  --input-bg: #0f1729;
-  --input-border: #1e293b;
+  --background: #111111;
+  --foreground: #e0e0e0;
+  --sidebar-bg: #161616;
+  --sidebar-border: #2a2a2a;
+  --card-bg: #1a1a1a;
+  --card-border: #2a2a2a;
+  --input-bg: #161616;
+  --input-border: #2a2a2a;
 
-  /* Hourglass design tokens (dark) */
-  --hg-bg: #0b1120;
-  --hg-surface-dim: #0f1729;
-  --hg-header-bg: #0b1120;
+  /* Hourglass design tokens (dark – graphite) */
+  --hg-bg: #111111;
+  --hg-surface-dim: #161616;
+  --hg-header-bg: #111111;
   --hg-primary: #38bdf8;
   --hg-primary-container: #0c4a6e;
-  --hg-secondary: #94a3b8;
+  --hg-secondary: #a0a0a0;
   --hg-tertiary: #a78bfa;
   --hg-tertiary-container: #4c1d95;
   --hg-error: #f87171;
-  --hg-surface-container: #131c2e;
-  --hg-surface-container-high: #1e293b;
-  --hg-surface-container-low: #0f1729;
-  --hg-surface-variant: #1e293b;
-  --hg-outline-variant: #1e293b;
-  --hg-on-surface: #e2e8f0;
-  --hg-on-surface-variant: #94a3b8;
-  --hg-sidebar-bg: #0f1729;
+  --hg-surface-container: #1a1a1a;
+  --hg-surface-container-high: #2a2a2a;
+  --hg-surface-container-low: #161616;
+  --hg-surface-variant: #2a2a2a;
+  --hg-outline-variant: #2a2a2a;
+  --hg-on-surface: #e0e0e0;
+  --hg-on-surface-variant: #8a8a8a;
+  --hg-sidebar-bg: #161616;
 }
 
 @theme inline {

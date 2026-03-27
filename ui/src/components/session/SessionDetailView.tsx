@@ -330,7 +330,7 @@ export function SessionDetailView({
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <Spinner className="h-8 w-8 text-blue-400" />
+        <Spinner className="h-8 w-8 text-hg-primary" />
       </div>
     );
   }
@@ -339,7 +339,7 @@ export function SessionDetailView({
     return (
       <div className="flex-1 flex items-center justify-center p-8">
         <Card className="p-8 text-center max-w-md">
-          <p className="text-red-500 dark:text-red-400 mb-4">{error || 'Session not found'}</p>
+          <p className="text-hg-error mb-4">{error || 'Session not found'}</p>
           <Button onClick={onNavigateHome}>
             Go Home
           </Button>
@@ -361,7 +361,7 @@ export function SessionDetailView({
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
       {/* Sticky Header */}
-      <header className="flex-shrink-0 bg-[var(--card-bg)] border-b border-[var(--card-border)] sticky top-0 z-10">
+      <header className="flex-shrink-0 bg-hg-bg sticky top-0 z-10">
         <div className={`${maxWidthClass} mx-auto px-4 py-3 overflow-hidden`}>
           <div className="flex items-center justify-between overflow-hidden w-full">
             <div className="flex overflow-hidden gap-3 mr-8">
@@ -399,7 +399,7 @@ export function SessionDetailView({
                       setEditingName(true);
                     }
                   }}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
+                  className="text-hg-on-surface-variant hover:text-hg-on-surface cursor-pointer"
                   title="Edit session name"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -430,7 +430,7 @@ export function SessionDetailView({
             {showCloseButton && onClose && (
                 <button
                   onClick={onClose}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 mr-0 ml-4 cursor-pointer"
+                  className="text-hg-on-surface-variant hover:text-hg-on-surface mr-0 ml-4 cursor-pointer"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -439,24 +439,24 @@ export function SessionDetailView({
               )}
           </div>
           {/* Working Directory and Session ID */}
-          <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
+          <div className="mt-1 flex items-center justify-between text-xs text-hg-on-surface-variant/70">
             <div className="flex items-center gap-1.5">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
               <span className="font-mono truncate">{session.workDir}</span>
               {session.personality && (
-                <span className="ml-2 text-gray-500 dark:text-gray-400 font-medium">
+                <span className="ml-2 text-hg-on-surface-variant font-medium">
                   {session.personality.readableId}
                 </span>
               )}
               {session.project && (
-                <span className="ml-2 text-gray-500 dark:text-gray-400 font-medium">
+                <span className="ml-2 text-hg-on-surface-variant font-medium">
                   {session.project.name}
                 </span>
               )}
             </div>
-            <span className="font-mono text-gray-400 ml-4" title={`Session ID: ${session.id}`}>
+            <span className="font-mono text-hg-on-surface-variant/50 ml-4" title={`Session ID: ${session.id}`}>
               {session.id.slice(0, 8)}
             </span>
           </div>
@@ -466,7 +466,7 @@ export function SessionDetailView({
 
 
       {/* Tab Bar */}
-      <div className="flex-shrink-0 border-b border-[var(--card-border)] bg-[var(--card-bg)]">
+      <div className="flex-shrink-0 border-b border-hg-outline-variant/15 bg-hg-bg">
         <div className={`${maxWidthClass} mx-auto px-4`}>
           <div className="flex gap-0">
             {(['agent', 'files', 'git', ...(session.project ? ['messages' as const, 'workspace' as const] : [])] as const).map((tab) => {
@@ -483,8 +483,8 @@ export function SessionDetailView({
                   onClick={() => setActiveTab(tab)}
                   className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
                     activeTab === tab
-                      ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'
+                      ? 'border-hg-primary text-hg-primary'
+                      : 'border-transparent text-hg-on-surface-variant hover:text-hg-on-surface hover:border-hg-outline-variant'
                   }`}
                 >
                   {labels[tab] || tab}
@@ -506,7 +506,7 @@ export function SessionDetailView({
           >
             <div className={`${maxWidthClass} mx-auto px-4 py-6 space-y-6`}>
               {sortedTurns.length === 0 && (
-                <div className="text-center text-gray-500 py-12">
+                <div className="text-center text-hg-on-surface-variant py-12">
                   <p>No messages yet</p>
                 </div>
               )}
@@ -531,9 +531,9 @@ export function SessionDetailView({
 
               {/* Inline Approval Requests - only show in manual mode */}
               {pendingApprovals.length > 0 && session.approvalMode === 'manual' && (
-                <div id="inline-approvals" className="space-y-3 p-4 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] animate-pulse-slow">
+                <div id="inline-approvals" className="space-y-3 p-4 rounded-xl border border-hg-outline-variant/15 bg-hg-bg animate-pulse-slow">
                   <div className="flex items-center gap-2">
-                    <span className="text-[var(--text-primary)] font-medium text-sm">
+                    <span className="text-hg-on-surface font-medium text-sm">
                       Action Required: {pendingApprovals.length} Pending Approval{pendingApprovals.length > 1 ? 's' : ''}
                     </span>
                   </div>
@@ -555,7 +555,7 @@ export function SessionDetailView({
         </>
       ) : activeTab === 'files' ? (
         /* Files Tab */
-        <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
           <FileExplorer
             initialPath={session.workDir}
             mode="browse"
@@ -600,7 +600,7 @@ export function SessionDetailView({
       ) : null}
 
       {/* Sticky Input Area - only show on Agent tab */}
-      {activeTab === 'agent' && <div className="flex-shrink-0 border-t border-[var(--card-border)] bg-[var(--card-bg)] sticky bottom-0">
+      {activeTab === 'agent' && <div className="flex-shrink-0 border-t border-hg-outline-variant/15 bg-hg-bg sticky bottom-0">
         <div className={`${maxWidthClass} mx-auto px-4 py-4`}>
           {/* Image Previews */}
           {followUpImages.length > 0 && (
@@ -610,7 +610,7 @@ export function SessionDetailView({
                   <img
                     src={`data:${image.mediaType};base64,${image.data}`}
                     alt={`Attached image ${index + 1}`}
-                    className="h-16 w-16 object-cover rounded-lg border border-[var(--input-border)]"
+                    className="h-16 w-16 object-cover rounded-lg border border-hg-outline-variant/30"
                   />
                   <button
                     type="button"
@@ -672,7 +672,7 @@ export function SessionDetailView({
               }
               rows={1}
               disabled={isRunning || !canFollowUp || submitting}
-              className="w-full px-4 py-3 text-sm rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] focus:outline-none resize-none disabled:opacity-50 disabled:cursor-not-allowed overflow-y-auto"
+              className="w-full px-4 py-3 text-sm rounded-xl border border-hg-outline-variant/30 bg-hg-surface-container focus:outline-none resize-none disabled:opacity-50 disabled:cursor-not-allowed overflow-y-auto"
               style={{ minHeight: '44px', maxHeight: '140px' }}
             />
           </div>
@@ -719,8 +719,8 @@ export function SessionDetailView({
               <button
                 onClick={handleToggleMode}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${session.approvalMode === 'auto'
-                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    ? 'bg-hg-surface-container-high text-hg-on-surface-variant hover:bg-hg-outline-variant'
+                    : 'bg-hg-surface-container-high text-hg-on-surface-variant hover:bg-hg-outline-variant'
                   }`}
                 title={session.approvalMode === 'auto'
                   ? 'All tool calls are being auto-approved. Click to switch to manual mode.'
@@ -948,7 +948,7 @@ function TeamMessagesTab({
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <Spinner className="h-6 w-6 text-blue-400" />
+        <Spinner className="h-6 w-6 text-hg-primary" />
       </div>
     );
   }
@@ -958,8 +958,8 @@ function TeamMessagesTab({
       {/* Messages stream */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {messages.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-500 py-16">
-            <svg className="w-12 h-12 mb-3 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex-1 flex flex-col items-center justify-center text-hg-on-surface-variant py-16">
+            <svg className="w-12 h-12 mb-3 text-hg-on-surface-variant/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
             <p className="text-sm font-medium">No messages yet</p>
@@ -971,11 +971,11 @@ function TeamMessagesTab({
               <div key={date}>
                 {/* Date separator */}
                 <div className="flex items-center gap-3 my-4">
-                  <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                  <span className="text-xs text-gray-400 font-medium px-2">
+                  <div className="flex-1 h-px bg-hg-outline-variant/20" />
+                  <span className="text-xs text-hg-on-surface-variant/50 font-medium px-2">
                     {formatMessageDate(date)}
                   </span>
-                  <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                  <div className="flex-1 h-px bg-hg-outline-variant/20" />
                 </div>
 
                 {/* Messages for this date */}
@@ -993,17 +993,17 @@ function TeamMessagesTab({
                         {/* Message content */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline gap-2">
-                            <span className={`text-sm font-semibold ${isCurrentUser ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                            <span className={`text-sm font-semibold ${isCurrentUser ? 'text-hg-primary' : 'text-hg-on-surface'}`}>
                               {msg.sender}
                             </span>
-                            <span className="text-xs text-gray-400">
+                            <span className="text-xs text-hg-on-surface-variant/50">
                               → {msg.target}
                             </span>
-                            <span className="text-xs text-gray-400">
+                            <span className="text-xs text-hg-on-surface-variant/50">
                               {msg.timestamp}
                             </span>
                           </div>
-                          <div className="mt-1 text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
+                          <div className="mt-1 text-sm text-hg-on-surface whitespace-pre-wrap break-words">
                             {msg.content}
                           </div>
                         </div>
@@ -1019,7 +1019,7 @@ function TeamMessagesTab({
       </div>
 
       {/* Composer */}
-      <div className="flex-shrink-0 border-t border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-3">
+      <div className="flex-shrink-0 border-t border-hg-outline-variant/15 bg-hg-bg px-4 py-3">
         <div className="flex items-center gap-2 mb-2">
           <Dropdown
             value={sender}
@@ -1027,7 +1027,7 @@ function TeamMessagesTab({
             options={senderOptions.map(s => ({ value: s, label: s }))}
             size="sm"
           />
-          <span className="text-xs text-gray-500">→</span>
+          <span className="text-xs text-hg-on-surface-variant/70">→</span>
           <Dropdown
             value={target}
             onChange={setTarget}
@@ -1044,7 +1044,7 @@ function TeamMessagesTab({
             placeholder="Type a message... (Enter to send, Shift+Enter for new line)"
             rows={1}
             disabled={sending}
-            className="flex-1 px-3 py-2 text-sm rounded-lg border border-[var(--input-border)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50"
+            className="flex-1 px-3 py-2 text-sm rounded-lg border border-hg-outline-variant/30 bg-hg-surface-container focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50"
             style={{ minHeight: '38px', maxHeight: '120px' }}
           />
           <Button
@@ -1105,14 +1105,14 @@ function InlineApprovalCard({
   };
 
   return (
-    <div className="bg-[var(--card-bg)] rounded-lg border border-[var(--card-border)] overflow-hidden shadow-sm">
+    <div className="bg-hg-bg rounded-lg border border-hg-outline-variant/15 overflow-hidden shadow-sm">
       <div className="flex items-center justify-between p-3">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <span className="text-gray-500 dark:text-gray-400 text-lg">🔧</span>
+          <span className="text-hg-on-surface-variant text-lg">🔧</span>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium">{approval.toolName}</div>
             {!isExpanded && (
-              <div className="text-xs text-gray-500 truncate">{getSummary()}</div>
+              <div className="text-xs text-hg-on-surface-variant/70 truncate">{getSummary()}</div>
             )}
           </div>
         </div>
@@ -1141,8 +1141,8 @@ function InlineApprovalCard({
         </div>
       </div>
       {isExpanded && (
-        <div className="border-t border-gray-200 dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-900/50">
-          <pre className="text-xs text-gray-700 dark:text-gray-300 overflow-x-auto whitespace-pre-wrap max-h-64 overflow-y-auto">
+        <div className="p-3 bg-hg-surface-container-low">
+          <pre className="text-xs text-hg-on-surface-variant overflow-x-auto whitespace-pre-wrap max-h-64 overflow-y-auto">
             {inputStr}
           </pre>
         </div>
@@ -1607,15 +1607,15 @@ function ConversationTurnView({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-sm font-medium">You</span>
-            <span className="text-xs text-gray-500">Turn {turnNumber}</span>
+            <span className="text-xs text-hg-on-surface-variant/70">Turn {turnNumber}</span>
           </div>
-          <div className="rounded-lg p-3 bg-gray-100 dark:bg-gray-800">
+          <div>
             <p className="whitespace-pre-wrap text-sm">{truncatedPrompt}</p>
             {isPromptLong && (
               <div className="flex justify-end mt-1">
                 <button
                   onClick={() => setIsPromptExpanded(!isPromptExpanded)}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                  className="text-xs text-hg-primary hover:underline cursor-pointer"
                 >
                   {isPromptExpanded ? 'Show less' : 'Read more'}
                 </button>
@@ -1629,7 +1629,7 @@ function ConversationTurnView({
                     <img
                       src={`data:${image.mediaType};base64,${image.data}`}
                       alt={`Attached image ${index + 1}`}
-                      className="h-24 w-24 object-cover rounded-lg border border-blue-200 dark:border-blue-700"
+                      className="h-24 w-24 object-cover rounded-lg border border-hg-outline-variant/30"
                     />
                   </div>
                 ))}
@@ -1647,8 +1647,8 @@ function ConversationTurnView({
             <span className="text-sm font-medium">{getConnectorDisplayName(connectorType)}</span>
             <StatusBadge status={process.status} />
             {isLive && isConnected && (
-              <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-pulse" />
+              <span className="flex items-center gap-1 text-xs text-hg-on-surface-variant">
+                <span className="w-2 h-2 bg-hg-primary/50 rounded-full animate-pulse" />
                 Streaming
               </span>
             )}
@@ -1656,10 +1656,10 @@ function ConversationTurnView({
 
           {/* Collapsible Tool Calls / Details Section */}
           {hasToolCalls && (
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden mb-3">
+            <div className="bg-hg-surface-container-low rounded-lg border border-hg-outline-variant/15 overflow-hidden mb-3">
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full px-4 py-2 flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
+                className="w-full px-4 py-2 flex items-center justify-between text-sm text-hg-on-surface-variant hover:bg-hg-surface-container-high/50 transition-colors cursor-pointer"
               >
                 <span className="flex items-center gap-2">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1679,14 +1679,14 @@ function ConversationTurnView({
               {isExpanded && (
                 <>
                   {isLoading ? (
-                    <div className="p-4 flex items-center justify-center border-t border-gray-200 dark:border-gray-700">
-                      <Spinner className="h-5 w-5 text-gray-400" />
+                    <div className="p-4 flex items-center justify-center border-t border-hg-outline-variant/10">
+                      <Spinner className="h-5 w-5 text-hg-on-surface-variant/50" />
                     </div>
                   ) : (
                     <div
                       ref={containerRef}
                       onScroll={handleScroll}
-                      className="max-h-96 overflow-y-auto p-4 font-mono text-sm space-y-2 border-t border-gray-200 dark:border-gray-700"
+                      className="max-h-96 overflow-y-auto p-4 font-mono text-sm space-y-2 border-t border-hg-outline-variant/10"
                     >
                       {parsedLogs.map((log, index) => (
                         <ParsedLogLine key={index} log={log} />
@@ -1696,7 +1696,7 @@ function ConversationTurnView({
                 </>
               )}
               {process.exitCode !== null && (
-                <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-2 text-xs text-gray-500 flex justify-between">
+                <div className="border-t border-hg-outline-variant/10 px-4 py-2 text-xs text-hg-on-surface-variant/70 flex justify-between">
                   <span>Exit code: {process.exitCode}</span>
                   {process.completedAt && (
                     <span>Completed: {new Date(process.completedAt).toLocaleString()}</span>
@@ -1708,10 +1708,10 @@ function ConversationTurnView({
 
           {/* Non-tool logs (assistant text) when no tool calls */}
           {!hasToolCalls && parsedLogs.length > 0 && (
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden mb-3">
+            <div className="bg-hg-surface-container-low rounded-lg border border-hg-outline-variant/15 overflow-hidden mb-3">
               {isLoading ? (
                 <div className="p-4 flex items-center justify-center">
-                  <Spinner className="h-5 w-5 text-gray-400" />
+                  <Spinner className="h-5 w-5 text-hg-on-surface-variant/50" />
                 </div>
               ) : (
                 <div
@@ -1725,7 +1725,7 @@ function ConversationTurnView({
                 </div>
               )}
               {process.exitCode !== null && (
-                <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-2 text-xs text-gray-500 flex justify-between">
+                <div className="border-t border-hg-outline-variant/10 px-4 py-2 text-xs text-hg-on-surface-variant/70 flex justify-between">
                   <span>Exit code: {process.exitCode}</span>
                   {process.completedAt && (
                     <span>Completed: {new Date(process.completedAt).toLocaleString()}</span>
@@ -1737,17 +1737,17 @@ function ConversationTurnView({
 
           {/* Loading state when no logs yet */}
           {isLoading && parsedLogs.length === 0 && (
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden mb-3">
+            <div className="bg-hg-surface-container-low rounded-lg border border-hg-outline-variant/15 overflow-hidden mb-3">
               <div className="p-4 flex items-center justify-center">
-                <Spinner className="h-5 w-5 text-gray-400" />
+                <Spinner className="h-5 w-5 text-hg-on-surface-variant/50" />
               </div>
             </div>
           )}
 
           {/* Waiting state */}
           {!isLoading && parsedLogs.length === 0 && !finalResult && (
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden mb-3">
-              <div className="p-4 text-gray-500 text-sm">
+            <div className="bg-hg-surface-container-low rounded-lg border border-hg-outline-variant/15 overflow-hidden mb-3">
+              <div className="p-4 text-hg-on-surface-variant text-sm">
                 {isLive ? 'Waiting for response...' : 'No logs available'}
               </div>
             </div>
@@ -1758,12 +1758,12 @@ function ConversationTurnView({
             <div className="pt-2">
               {finalResult.cost && (
                 <div className="flex justify-end mb-1">
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-hg-on-surface-variant/70">
                     Cost: ${finalResult.cost.toFixed(4)}
                   </span>
                 </div>
               )}
-              <div className="text-[var(--text-primary)] prose prose-sm dark:prose-invert max-w-none">
+              <div className="text-hg-on-surface prose prose-sm dark:prose-invert max-w-none">
                 <ReactMarkdown>{ensureString(finalResult.content)}</ReactMarkdown>
               </div>
             </div>
@@ -1788,34 +1788,34 @@ function ParsedLogLine({
   switch (parsed.type) {
     case 'assistant':
       return (
-        <div className="text-[var(--text-primary)] whitespace-pre-wrap text-sm">
+        <div className="text-hg-on-surface whitespace-pre-wrap text-sm">
           {content}
         </div>
       );
 
     case 'user':
       return (
-        <div className="border-l-2 border-gray-300 dark:border-gray-600 pl-3 my-2 p-2 rounded-r">
-          <div className="text-gray-500 dark:text-gray-400 text-xs mb-1">You</div>
-          <div className="text-[var(--text-primary)] whitespace-pre-wrap text-sm">{content}</div>
+        <div className="border-l-2 border-hg-outline-variant/30 pl-3 my-2 p-2 rounded-r">
+          <div className="text-hg-on-surface-variant text-xs mb-1">You</div>
+          <div className="text-hg-on-surface whitespace-pre-wrap text-sm">{content}</div>
         </div>
       );
 
     case 'tool_call':
       return (
-        <div className="border-l-2 border-gray-300 dark:border-gray-600 pl-3 my-2">
-          <div className="text-gray-500 dark:text-gray-400 text-xs mb-1">{parsed.toolName}</div>
-          <pre className="text-gray-700 dark:text-gray-300 text-xs overflow-x-auto">{content}</pre>
+        <div className="border-l-2 border-hg-outline-variant/30 pl-3 my-2">
+          <div className="text-hg-on-surface-variant text-xs mb-1">{parsed.toolName}</div>
+          <pre className="text-hg-on-surface-variant text-xs overflow-x-auto">{content}</pre>
         </div>
       );
 
     case 'tool_result':
       return (
-        <div className={`border-l-2 ${parsed.isError ? 'border-red-400 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'} pl-3 my-1`}>
-          <div className={`text-xs mb-1 ${parsed.isError ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+        <div className={`border-l-2 ${parsed.isError ? 'border-hg-error/50' : 'border-hg-outline-variant/30'} pl-3 my-1`}>
+          <div className={`text-xs mb-1 ${parsed.isError ? 'text-hg-error' : 'text-hg-on-surface-variant'}`}>
             {parsed.isError ? 'Error' : 'Output'}
           </div>
-          <pre className={`text-xs overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto ${parsed.isError ? 'text-red-600 dark:text-red-300' : 'text-gray-600 dark:text-gray-400'}`}>
+          <pre className={`text-xs overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto ${parsed.isError ? 'text-hg-error/80' : 'text-hg-on-surface-variant/70'}`}>
             {content}
           </pre>
         </div>
@@ -1826,14 +1826,14 @@ function ParsedLogLine({
 
     case 'system':
       return (
-        <div className="text-gray-500 dark:text-gray-400 text-xs">
+        <div className="text-hg-on-surface-variant text-xs">
           {content}
         </div>
       );
 
     case 'thinking':
       return (
-        <div className="text-gray-400 dark:text-gray-500 text-xs italic">
+        <div className="text-hg-on-surface-variant/70 text-xs italic">
           {content}
         </div>
       );
@@ -1841,7 +1841,7 @@ function ParsedLogLine({
     default:
       if (logType === 'stderr') {
         return (
-          <div className="text-red-500 dark:text-red-400 whitespace-pre-wrap break-all text-xs">
+          <div className="text-hg-error whitespace-pre-wrap break-all text-xs">
             {content}
           </div>
         );

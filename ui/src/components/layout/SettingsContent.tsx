@@ -338,7 +338,7 @@ export function SettingsContent() {
 
                 {/* Add New */}
                 <div className="pt-4 border-t border-hg-outline-variant/20 space-y-2">
-                  <span className="font-label text-hg-on-surface-variant">Add New Personality</span>
+                  <span className="text-xs font-medium text-hg-on-surface-variant">Add New Personality</span>
                   <div className="grid grid-cols-2 gap-2">
                     <Input
                       value={newPersonalityName}
@@ -403,7 +403,7 @@ export function SettingsContent() {
 
                 {/* Add New */}
                 <div className="pt-4 border-t border-hg-outline-variant/20 space-y-2">
-                  <span className="font-label text-hg-on-surface-variant">Add New Project</span>
+                  <span className="text-xs font-medium text-hg-on-surface-variant">Add New Project</span>
                   <div className="grid grid-cols-2 gap-2">
                     <Input
                       value={newProjectName}
@@ -588,7 +588,7 @@ export function SettingsContent() {
                 {apiKeys.map((key) => (
                   <div key={key.id} className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="font-label text-hg-on-surface-variant">
+                      <span className="text-xs font-medium text-hg-on-surface-variant">
                         {PROVIDERS.find((p) => p.value === key.provider)?.label || key.provider}
                       </span>
                       <button
@@ -623,7 +623,7 @@ export function SettingsContent() {
 
                 {/* Add New Key */}
                 <div className={`space-y-2 ${apiKeys.length > 0 ? 'pt-3 border-t border-hg-outline-variant/20' : ''}`}>
-                  <span className="font-label text-hg-on-surface-variant">Add Key</span>
+                  <span className="text-xs font-medium text-hg-on-surface-variant">Add Key</span>
                   <select
                     value={provider}
                     onChange={(e) => setProvider(e.target.value)}
