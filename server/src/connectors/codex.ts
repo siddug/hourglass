@@ -21,11 +21,20 @@ export interface CodexConnectorConfig extends ConnectorConfig {
   /** Sandbox mode to use for Codex CLI */
   sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
 
+  /**
+   * When true, Hourglass will rely on an outer sandbox and ask Codex to bypass
+   * its own approvals and sandbox checks for the lowest-friction execution.
+   */
+  dangerouslyBypassApprovalsAndSandbox?: boolean;
+
   /** Allow running outside a git repository */
   skipGitRepoCheck?: boolean;
 
   /** Use Codex ephemeral mode */
   ephemeral?: boolean;
+
+  /** Additional directories to make writable inside Codex's workspace sandbox */
+  additionalWritableDirs?: string[];
 }
 
 /**
@@ -37,7 +46,9 @@ export interface CodexConnectorConfig extends ConnectorConfig {
  *
  * Hourglass approval streaming is not available for this connector because
  * Codex exec does not expose the same interactive control protocol used by
- * the Claude/Vibe connectors.
+ * the Claude/Vibe connectors. Auto mode therefore maps to Codex's
+ * non-interactive "never prompt" execution, while manual mode remains
+ * unsupported for exec sessions.
  */
 export class CodexConnector extends AbstractConnector {
   readonly name = 'codex';
@@ -94,7 +105,7 @@ export class CodexConnector extends AbstractConnector {
 
   getUnsupportedApprovalModeMessage(mode: ConnectorApprovalMode): string | null {
     if (mode === 'manual') {
-      return 'Codex CLI currently supports Hourglass sessions in auto approval mode only.';
+      return 'Codex CLI exec sessions are non-interactive in Hourglass, so manual tool approvals are not available yet.';
     }
 
     return null;
@@ -205,7 +216,7 @@ For more information, visit: https://developers.openai.com/codex/cli
   private buildExecArgs(options: SpawnOptions): string[] {
     const args = ['exec'];
 
-    this.appendCommonArgs(args);
+    this.appendCommonArgs(args, options);
 
     if (options.prompt) {
       args.push(options.prompt);
@@ -217,7 +228,7 @@ For more information, visit: https://developers.openai.com/codex/cli
   private buildResumeArgs(options: SpawnOptions & { sessionId: string }): string[] {
     const args = ['exec', 'resume'];
 
-    this.appendResumeArgs(args);
+    this.appendResumeArgs(args, options);
 
     args.push(options.sessionId);
 
@@ -228,21 +239,34 @@ For more information, visit: https://developers.openai.com/codex/cli
     return args;
   }
 
-  private appendCommonArgs(args: string[]): void {
+  private appendCommonArgs(args: string[], options: SpawnOptions): void {
     args.push('--json');
 
     if (this.codexConfig.model) {
       args.push('--model', this.codexConfig.model);
     }
 
-    args.push('--full-auto');
+    const approvalMode = options.approvalMode ?? 'auto';
+    const explicitSandboxMode = this.codexConfig.sandboxMode;
+    const effectiveSandboxMode = explicitSandboxMode ?? 'workspace-write';
 
-    if (this.codexConfig.sandboxMode) {
-      args.push('--sandbox', this.codexConfig.sandboxMode);
+    if (approvalMode === 'auto') {
+      if (this.shouldBypassCodexApprovalsAndSandbox(explicitSandboxMode)) {
+        args.push('--dangerously-bypass-approvals-and-sandbox');
+      } else {
+        args.push('-c', 'approval_policy="never"');
+        args.push('--sandbox', effectiveSandboxMode);
+      }
+    } else if (effectiveSandboxMode) {
+      args.push('--sandbox', effectiveSandboxMode);
     }
 
     if (this.codexConfig.skipGitRepoCheck ?? true) {
       args.push('--skip-git-repo-check');
+    }
+
+    for (const dir of this.getWritableDirs()) {
+      args.push('--add-dir', dir);
     }
 
     if (this.codexConfig.ephemeral) {
@@ -254,8 +278,31 @@ For more information, visit: https://developers.openai.com/codex/cli
     }
   }
 
-  private appendResumeArgs(args: string[]): void {
-    this.appendCommonArgs(args);
+  private appendResumeArgs(args: string[], options: SpawnOptions): void {
+    this.appendCommonArgs(args, options);
+  }
+
+  private shouldBypassCodexApprovalsAndSandbox(
+    explicitSandboxMode: CodexConnectorConfig['sandboxMode']
+  ): boolean {
+    if (this.codexConfig.dangerouslyBypassApprovalsAndSandbox) {
+      return true;
+    }
+
+    return !!this.codexConfig.sandbox?.enabled && !explicitSandboxMode;
+  }
+
+  private getWritableDirs(): string[] {
+    const home = homedir();
+    const defaultDirs = [
+      join(home, '.cache'),
+      join(home, '.local', 'share', 'uv'),
+      join(home, 'Library', 'Caches'),
+    ];
+
+    const configuredDirs = this.codexConfig.additionalWritableDirs || [];
+
+    return Array.from(new Set([...defaultDirs, ...configuredDirs]));
   }
 
   private hasApiKeyEnv(): boolean {

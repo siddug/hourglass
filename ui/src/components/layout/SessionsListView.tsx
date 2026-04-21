@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useServer } from '@/contexts/ServerContext';
-import { useCommandCenter, type OpenSessionTarget } from '@/contexts/CommandCenterContext';
+import {
+  useCommandCenter,
+  type NewSessionOptions,
+  type OpenSessionTarget,
+} from '@/contexts/CommandCenterContext';
 import { getSessions, type Session } from '@/lib/api';
 import { Spinner } from '@/components/ui';
 import { SessionDetailView } from '@/components/session/SessionDetailView';
@@ -15,6 +19,7 @@ export function SessionsListView() {
   const [loading, setLoading] = useState(true);
   const [selectedSessionTarget, setSelectedSessionTarget] = useState<OpenSessionTarget | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createModalWorkDir, setCreateModalWorkDir] = useState<string | undefined>(undefined);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const fetchSessions = useCallback(async () => {
@@ -40,17 +45,27 @@ export function SessionsListView() {
     setSelectedSessionTarget(target);
   }, []);
 
+  const openCreateModal = useCallback((options?: NewSessionOptions) => {
+    setCreateModalWorkDir(options?.initialWorkDir);
+    setCreateModalOpen(true);
+  }, []);
+
+  const closeCreateModal = useCallback(() => {
+    setCreateModalWorkDir(undefined);
+    setCreateModalOpen(false);
+  }, []);
+
   useEffect(() => {
     registerSurface({
       viewMode: 'sessions',
-      openNewSession: () => setCreateModalOpen(true),
+      openNewSession: openCreateModal,
       openSession,
-      closeModalSession: createModalOpen ? () => setCreateModalOpen(false) : undefined,
+      closeModalSession: createModalOpen ? closeCreateModal : undefined,
       refresh: fetchSessions,
     });
 
     return () => registerSurface(null);
-  }, [createModalOpen, fetchSessions, openSession, registerSurface]);
+  }, [closeCreateModal, createModalOpen, fetchSessions, openCreateModal, openSession, registerSurface]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -103,7 +118,7 @@ export function SessionsListView() {
             </div>
             {/* New Session Button */}
             <button
-              onClick={() => setCreateModalOpen(true)}
+              onClick={() => openCreateModal()}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--input-border)] hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm cursor-pointer"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -191,13 +206,15 @@ export function SessionsListView() {
       {/* Create Modal */}
       <SessionCreateModal
         open={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
+        onClose={closeCreateModal}
         onCreated={(sessionId) => {
           if (sessionId) {
             setSelectedSessionTarget({ sessionId });
           }
+          setCreateModalWorkDir(undefined);
           fetchSessions();
         }}
+        initialWorkDir={createModalWorkDir}
       />
     </div>
   );

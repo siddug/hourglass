@@ -757,7 +757,7 @@ export function SessionDetailView({
                     : 'bg-hg-surface-container-high text-hg-on-surface-variant hover:bg-hg-outline-variant'
                   }`}
                 title={approvalToggleDisabled
-                  ? 'Codex CLI sessions currently support auto approval only.'
+                  ? 'Codex CLI exec sessions are non-interactive in Hourglass, so manual approvals are unavailable.'
                   : session.approvalMode === 'auto'
                   ? 'All tool calls are being auto-approved. Click to switch to manual mode.'
                   : 'Click to switch to auto-approve mode'}

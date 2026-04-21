@@ -26,5 +26,8 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@ccusage/codex": "^18.0.10"
+  }
 }

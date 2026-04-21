@@ -493,7 +493,7 @@ export function ScheduledTaskCreateModal({ open, onClose, onCreated }: Scheduled
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {!manualApprovalSupported
-                ? 'Codex CLI currently supports auto approval only in Hourglass'
+                ? 'Codex CLI exec sessions are non-interactive in Hourglass, so scheduled runs use auto mode only'
                 : approvalMode === 'auto'
                 ? 'All tool calls will be auto-approved (recommended for scheduled tasks)'
                 : 'Tool calls will require manual approval'}

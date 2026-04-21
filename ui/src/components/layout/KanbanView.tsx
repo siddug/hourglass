@@ -15,7 +15,12 @@ import { usePaginatedSessions } from '@/hooks/usePaginatedSessions';
 import { Spinner } from '@/components/ui';
 import { SessionCreateModal } from '@/components/session/SessionCreateModal';
 import { SessionDetailModal } from '@/components/session/SessionDetailModal';
-import { useCommandCenter, type OpenSessionTarget } from '@/contexts/CommandCenterContext';
+import {
+  useCommandCenter,
+  type NewSessionOptions,
+  type OpenSessionTarget,
+  type ShowKanbanOptions,
+} from '@/contexts/CommandCenterContext';
 
 const COLUMNS: { status: SessionStatus; title: string; badgeBg: string }[] = [
   { status: 'triage', title: 'Triage', badgeBg: 'bg-hg-surface-container-high text-hg-on-surface-variant' },
@@ -36,6 +41,7 @@ export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewPr
   const { registerSurface } = useCommandCenter();
   const { columns, loadMore, refresh, smartRefresh, moveSessionOptimistically } = usePaginatedSessions();
   const [createModalOpen, setCreateModalOpen] = useState(initialCreateOpen ?? false);
+  const [createModalWorkDir, setCreateModalWorkDir] = useState<string | undefined>(undefined);
   const [selectedSessionTarget, setSelectedSessionTarget] = useState<OpenSessionTarget | null>(
     initialSessionId ? { sessionId: initialSessionId } : null
   );
@@ -85,13 +91,24 @@ export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewPr
     window.history.pushState(null, '', '/kanban');
   }, []);
 
-  const openCreateModal = useCallback(() => {
+  const openCreateModal = useCallback((options?: NewSessionOptions) => {
+    setCreateModalWorkDir(options?.initialWorkDir);
     setCreateModalOpen(true);
     window.history.pushState(null, '', '/kanban/new');
   }, []);
 
   const closeCreateModal = useCallback(() => {
+    setCreateModalWorkDir(undefined);
     setCreateModalOpen(false);
+    window.history.pushState(null, '', '/kanban');
+  }, []);
+
+  const showKanban = useCallback((options?: ShowKanbanOptions) => {
+    setCreateModalWorkDir(undefined);
+    setCreateModalOpen(false);
+    setSelectedSessionTarget(null);
+    setProjectFilter('');
+    setWorkDirFilter(options?.workDirFilter ?? '');
     window.history.pushState(null, '', '/kanban');
   }, []);
 
@@ -110,6 +127,7 @@ export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewPr
       viewMode: 'kanban',
       openNewSession: openCreateModal,
       openSession,
+      showKanban,
       closeModalSession: createModalOpen
         ? closeCreateModal
         : selectedSessionTarget
@@ -127,6 +145,7 @@ export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewPr
     openSession,
     registerSurface,
     selectedSessionTarget,
+    showKanban,
     smartRefresh,
   ]);
 
@@ -270,7 +289,7 @@ export function KanbanView({ initialSessionId, initialCreateOpen }: KanbanViewPr
         open={createModalOpen}
         onClose={closeCreateModal}
         onCreated={refresh}
-        initialWorkDir={workDirFilter}
+        initialWorkDir={createModalWorkDir ?? (workDirFilter || undefined)}
       />
 
       {/* Detail Modal */}
@@ -347,9 +366,11 @@ function KanbanColumn({
     }
   }, [menuOpen]);
 
-  // Show bulk actions menu for completed and failed columns
-  const showBulkActions = status === 'completed' || status === 'failed';
+  // Show bulk actions menu for completed, failed, and done columns
+  const showBulkActions = status === 'completed' || status === 'failed' || status === 'done';
   const hasSessions = sessions.length > 0;
+  const canMoveToDone = status === 'completed' || status === 'failed';
+  const canMoveToArchive = status === 'completed' || status === 'failed' || status === 'done';
 
   return (
     <div
@@ -369,7 +390,7 @@ function KanbanColumn({
           </span>
         </div>
         <div className="flex items-center gap-1">
-          {/* Bulk Actions Menu - only for completed/failed columns */}
+          {/* Bulk Actions Menu */}
           {showBulkActions && hasSessions && (
             <div className="relative" ref={menuRef}>
               <button
@@ -385,30 +406,34 @@ function KanbanColumn({
               </button>
               {menuOpen && (
                 <div className="absolute right-0 top-full mt-1 w-44 bg-hg-surface-container rounded-lg shadow-xl border border-hg-outline-variant/30 z-50 py-1">
-                  <button
-                    onClick={() => {
-                      onBulkMove(status, 'done');
-                      setMenuOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm text-hg-on-surface hover:bg-hg-surface-container-high flex items-center gap-2 cursor-pointer"
-                  >
-                    <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Move all to Done
-                  </button>
-                  <button
-                    onClick={() => {
-                      onBulkMove(status, 'archived');
-                      setMenuOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm text-hg-on-surface hover:bg-hg-surface-container-high flex items-center gap-2 cursor-pointer"
-                  >
-                    <svg className="w-4 h-4 text-hg-on-surface-variant" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                    </svg>
-                    Move all to Archive
-                  </button>
+                  {canMoveToDone && (
+                    <button
+                      onClick={() => {
+                        onBulkMove(status, 'done');
+                        setMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-hg-on-surface hover:bg-hg-surface-container-high flex items-center gap-2 cursor-pointer"
+                    >
+                      <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Move all to Done
+                    </button>
+                  )}
+                  {canMoveToArchive && (
+                    <button
+                      onClick={() => {
+                        onBulkMove(status, 'archived');
+                        setMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-hg-on-surface hover:bg-hg-surface-container-high flex items-center gap-2 cursor-pointer"
+                    >
+                      <svg className="w-4 h-4 text-hg-on-surface-variant" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                      </svg>
+                      Move all to Archive
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -783,18 +808,30 @@ interface WorkDirSwitcherProps {
 function WorkDirSwitcher({ workDirs, value, onChange }: WorkDirSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const resetMenuState = useCallback(() => {
+    setSearch('');
+    setHighlightedIndex(-1);
+  }, []);
+
+  const closeMenu = useCallback(() => {
+    setOpen(false);
+    resetMenuState();
+  }, [resetMenuState]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
+        closeMenu();
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [closeMenu]);
 
   useEffect(() => {
     if (open) {
@@ -814,6 +851,22 @@ function WorkDirSwitcher({ workDirs, value, onChange }: WorkDirSwitcherProps) {
   const filteredWorkDirs = normalizedSearch
     ? workDirs.filter((workDir) => workDir.toLowerCase().includes(normalizedSearch))
     : workDirs;
+  const resolvedHighlightedIndex = filteredWorkDirs.length === 0
+    ? -1
+    : highlightedIndex >= filteredWorkDirs.length
+      ? filteredWorkDirs.length - 1
+      : highlightedIndex;
+
+  useEffect(() => {
+    if (!open || resolvedHighlightedIndex < 0) return;
+
+    optionRefs.current[resolvedHighlightedIndex]?.scrollIntoView({ block: 'nearest' });
+  }, [open, resolvedHighlightedIndex]);
+
+  const selectWorkDir = useCallback((nextValue: string) => {
+    onChange(nextValue);
+    closeMenu();
+  }, [closeMenu, onChange]);
 
   return (
     <div className="min-w-[140px] md:min-w-[180px]" ref={ref}>
@@ -822,7 +875,7 @@ function WorkDirSwitcher({ workDirs, value, onChange }: WorkDirSwitcherProps) {
           setOpen((current) => {
             const next = !current;
             if (!next) {
-              setSearch('');
+              resetMenuState();
             }
             return next;
           });
@@ -850,15 +903,52 @@ function WorkDirSwitcher({ workDirs, value, onChange }: WorkDirSwitcherProps) {
               ref={searchInputRef}
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setHighlightedIndex(-1);
+              }}
               onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown') {
+                  if (filteredWorkDirs.length === 0) return;
+                  e.preventDefault();
+                  setHighlightedIndex((current) => {
+                    if (current < 0) return 0;
+                    return (current + 1) % filteredWorkDirs.length;
+                  });
+                  return;
+                }
+
+                if (e.key === 'ArrowUp') {
+                  if (filteredWorkDirs.length === 0) return;
+                  e.preventDefault();
+                  setHighlightedIndex((current) => {
+                    if (current < 0) return filteredWorkDirs.length - 1;
+                    return (current - 1 + filteredWorkDirs.length) % filteredWorkDirs.length;
+                  });
+                  return;
+                }
+
+                if (e.key === 'Enter') {
+                  const highlightedWorkDir = resolvedHighlightedIndex >= 0 ? filteredWorkDirs[resolvedHighlightedIndex] : null;
+                  if (!highlightedWorkDir) return;
+                  e.preventDefault();
+                  selectWorkDir(highlightedWorkDir);
+                  return;
+                }
+
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  closeMenu();
+                }
+              }}
               placeholder="Search directories..."
               className="w-full px-3 py-2 text-sm rounded-md border border-hg-outline-variant/30 bg-hg-surface-container-low text-hg-on-surface placeholder:text-hg-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-hg-primary/40"
             />
           </div>
           <div className="max-h-[244px] overflow-y-auto">
             <button
-              onClick={() => { onChange(''); setOpen(false); setSearch(''); }}
+              onClick={() => selectWorkDir('')}
               className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors cursor-pointer ${
                 !value
                   ? 'bg-hg-primary/10 text-hg-primary'
@@ -872,12 +962,16 @@ function WorkDirSwitcher({ workDirs, value, onChange }: WorkDirSwitcherProps) {
                 </svg>
               )}
             </button>
-            {filteredWorkDirs.map((workDir) => (
+            {filteredWorkDirs.map((workDir, index) => (
               <button
                 key={workDir}
-                onClick={() => { onChange(workDir); setOpen(false); setSearch(''); }}
+                ref={(element) => {
+                  optionRefs.current[index] = element;
+                }}
+                onMouseEnter={() => setHighlightedIndex(index)}
+                onClick={() => selectWorkDir(workDir)}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors cursor-pointer ${
-                  value === workDir
+                  resolvedHighlightedIndex === index || value === workDir
                     ? 'bg-hg-primary/10 text-hg-primary'
                     : 'text-hg-on-surface hover:bg-hg-surface-container-high'
                 }`}

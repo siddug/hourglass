@@ -151,6 +151,25 @@ function validateApprovalModeSupport(
   };
 }
 
+function isFailedDoneEvent(event: { type: string; reason?: unknown; error?: unknown }): boolean {
+  if (event.type !== 'done') {
+    return false;
+  }
+
+  if (event.error) {
+    return true;
+  }
+
+  if (typeof event.reason !== 'string') {
+    return false;
+  }
+
+  return event.reason === 'error'
+    || event.reason.startsWith('API Error:')
+    || event.reason.includes('"type":"error"')
+    || event.reason.includes('"error":{');
+}
+
 export const sessionsRoutes: FastifyPluginAsync = async (server) => {
   const { db, registry, sessions: activeSessions } = server.state;
 
@@ -578,7 +597,7 @@ export const sessionsRoutes: FastifyPluginAsync = async (server) => {
         // Handle task completion (done event) in interactive mode
         // This happens when Claude sends a 'result' message or when an error occurs
         if (event.type === 'done') {
-          const isError = (event as any).reason === 'error' || (event as any).error;
+          const isError = isFailedDoneEvent(event);
           server.log.info({ sessionId, processId: currentProcessId, reason: (event as any).reason, error: isError }, 'Task completed (done event)');
           const completedAt = new Date();
 
@@ -940,19 +959,20 @@ export const sessionsRoutes: FastifyPluginAsync = async (server) => {
 
         // Handle task completion (done event)
         if (event.type === 'done') {
+          const isError = isFailedDoneEvent(event);
           const completedAt = new Date();
 
           db.db.update(executionProcesses)
             .set({
-              status: 'completed',
-              exitCode: 0,
+              status: isError ? 'failed' : 'completed',
+              exitCode: isError ? 1 : 0,
               completedAt,
             })
             .where(eq(executionProcesses.id, currentProcessId))
             .run();
 
           db.db.update(sessions)
-            .set({ status: 'completed' as SessionStatus, updatedAt: completedAt })
+            .set({ status: (isError ? 'failed' : 'completed') as SessionStatus, updatedAt: completedAt })
             .where(eq(sessions.id, id))
             .run();
 
@@ -1249,22 +1269,23 @@ export const sessionsRoutes: FastifyPluginAsync = async (server) => {
           // Handle task completion (done event) in interactive mode
           // This happens when Claude sends a 'result' message
           if (event.type === 'done') {
-            server.log.info({ sessionId: id, processId: currentProcessId, reason: (event as any).reason }, 'Task completed (done event)');
+            const isError = isFailedDoneEvent(event);
+            server.log.info({ sessionId: id, processId: currentProcessId, reason: (event as any).reason, error: isError }, 'Task completed (done event)');
             const completedAt = new Date();
 
-            // Update process status to completed
+            // Update process status based on the done event outcome
             db.db.update(executionProcesses)
               .set({
-                status: 'completed',
-                exitCode: 0,
+                status: isError ? 'failed' : 'completed',
+                exitCode: isError ? 1 : 0,
                 completedAt,
               })
               .where(eq(executionProcesses.id, currentProcessId))
               .run();
 
-            // Update session status to completed (allows follow-ups)
+            // Update session status to completed on success, failed on API/runtime errors
             db.db.update(sessions)
-              .set({ status: 'completed' as SessionStatus, updatedAt: completedAt })
+              .set({ status: (isError ? 'failed' : 'completed') as SessionStatus, updatedAt: completedAt })
               .where(eq(sessions.id, id))
               .run();
 

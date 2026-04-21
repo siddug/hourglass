@@ -6,6 +6,7 @@ import {
   createSession,
   createScheduledTask,
   fetchFromServer,
+  getSessionWorkDirs,
   getSkillsConfig,
   getPersonalities,
   getProjects,
@@ -74,12 +75,13 @@ export function SessionCreateForm({
   const [scheduleType, setScheduleType] = useState<ScheduleType>('cron');
   const [cronExpression, setCronExpression] = useState('0 9 * * *');
   const [runAt, setRunAt] = useState('');
-  const [timezone, setTimezone] = useState('UTC');
+  const timezone = 'UTC';
   const [inheritContext, setInheritContext] = useState(false);
 
   // Personality & Project state
   const [personalities, setPersonalities] = useState<Personality[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [workDirOptions, setWorkDirOptions] = useState<string[]>([]);
   const [personalityId, setPersonalityId] = useState('');
   const [projectId, setProjectId] = useState('');
 
@@ -175,12 +177,23 @@ export function SessionCreateForm({
 
   const fetchPersonalitiesAndProjects = useCallback(async () => {
     try {
-      const [personalitiesRes, projectsRes] = await Promise.all([
+      const [personalitiesRes, projectsRes, workDirsRes] = await Promise.allSettled([
         getPersonalities({ limit: 100 }),
         getProjects({ status: 'active', limit: 100 }),
+        getSessionWorkDirs(),
       ]);
-      setPersonalities(personalitiesRes.personalities);
-      setProjects(projectsRes.projects);
+
+      if (personalitiesRes.status === 'fulfilled') {
+        setPersonalities(personalitiesRes.value.personalities);
+      }
+
+      if (projectsRes.status === 'fulfilled') {
+        setProjects(projectsRes.value.projects);
+      }
+
+      if (workDirsRes.status === 'fulfilled') {
+        setWorkDirOptions(workDirsRes.value.workDirs.filter(Boolean));
+      }
     } catch {
       // Non-critical
     }
@@ -495,7 +508,12 @@ export function SessionCreateForm({
             <div className="rounded-xl border border-hg-outline-variant/30 bg-hg-surface-container-low p-5 space-y-4">
               <div>
                 <span className="font-label text-hg-on-surface-variant mb-2 block">Working Directory</span>
-                <WorkDirSelector value={workDir} onChange={setWorkDir} />
+                <WorkDirSelector
+                  value={workDir}
+                  onChange={setWorkDir}
+                  options={workDirOptions}
+                  variant="dropdown"
+                />
               </div>
               <div>
                 <span className="font-label text-hg-on-surface-variant mb-2 block">Project Context</span>
@@ -604,7 +622,7 @@ export function SessionCreateForm({
                 <div>
                   <span className="text-sm font-medium text-hg-on-surface">Inherit context between runs</span>
                   <p className="text-[11px] text-hg-on-surface-variant mt-0.5">
-                    Each execution continues from the previous session's context.
+                    Each execution continues from the previous session&apos;s context.
                   </p>
                 </div>
               </label>
@@ -729,7 +747,7 @@ export function SessionCreateForm({
               </div>
               {!manualApprovalSupported && (
                 <p className="mt-2 text-[11px] text-hg-on-surface-variant/70">
-                  Codex CLI currently runs through Hourglass in auto approval mode only.
+                  Codex CLI `exec` sessions are non-interactive in Hourglass, so they currently run in auto mode only.
                 </p>
               )}
             </div>

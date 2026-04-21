@@ -11,6 +11,7 @@ import {
 } from 'react';
 import {
   getSessions,
+  getSessionWorkDirs,
   interruptSession,
   killSession,
   updateSessionStatus,
@@ -27,10 +28,19 @@ export interface OpenSessionTarget {
   tab?: CommandSessionTab;
 }
 
+export interface NewSessionOptions {
+  initialWorkDir?: string;
+}
+
+export interface ShowKanbanOptions {
+  workDirFilter?: string;
+}
+
 interface SurfaceHandler {
   viewMode: ViewMode;
-  openNewSession?: () => void;
+  openNewSession?: (options?: NewSessionOptions) => void;
   openSession?: (target: OpenSessionTarget) => void;
+  showKanban?: (options?: ShowKanbanOptions) => void;
   closeModalSession?: () => void;
   refresh?: () => void | Promise<void>;
 }
@@ -44,23 +54,28 @@ interface FocusedSessionHandler {
 }
 
 type PendingIntent =
-  | { type: 'new-session'; targetView: ViewMode }
+  | { type: 'new-session'; targetView: ViewMode; options?: NewSessionOptions }
   | { type: 'open-session'; targetView: ViewMode; target: OpenSessionTarget }
+  | { type: 'show-kanban'; targetView: 'kanban'; options?: ShowKanbanOptions }
   | null;
 
 interface CommandCenterContextValue {
   paletteOpen: boolean;
   openPalette: () => void;
   closePalette: () => void;
-  requestNewSession: () => void;
+  requestNewSession: (options?: NewSessionOptions) => void;
   requestOpenSession: (target: OpenSessionTarget) => void;
+  requestShowKanban: (options?: ShowKanbanOptions) => void;
   requestCloseModalSession: () => void;
   registerSurface: (surface: SurfaceHandler | null) => void;
   registerFocusedSession: (session: FocusedSessionHandler | null) => void;
   focusedSession: FocusedSessionHandler | null;
   commandSessions: Session[];
   commandSessionsLoading: boolean;
+  commandWorkDirs: string[];
+  commandWorkDirsLoading: boolean;
   refreshCommandSessions: (force?: boolean) => Promise<void>;
+  refreshCommandWorkDirs: (force?: boolean) => Promise<void>;
   performSessionStatusChange: (sessionId: string, status: SessionStatus) => Promise<void>;
   performSessionInterrupt: (sessionId: string) => Promise<void>;
   performSessionKill: (sessionId: string) => Promise<void>;
@@ -81,7 +96,10 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
   const [pendingIntent, setPendingIntent] = useState<PendingIntent>(null);
   const [commandSessions, setCommandSessions] = useState<Session[]>([]);
   const [commandSessionsLoading, setCommandSessionsLoading] = useState(false);
+  const [commandWorkDirs, setCommandWorkDirs] = useState<string[]>([]);
+  const [commandWorkDirsLoading, setCommandWorkDirsLoading] = useState(false);
   const [lastSessionFetchAt, setLastSessionFetchAt] = useState(0);
+  const [lastWorkDirFetchAt, setLastWorkDirFetchAt] = useState(0);
 
   const activeServerId = activeServer?.id ?? 'default';
   const surfaceRef = useRef<SurfaceHandler | null>(null);
@@ -97,7 +115,9 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setCommandSessions([]);
+    setCommandWorkDirs([]);
     setLastSessionFetchAt(0);
+    setLastWorkDirFetchAt(0);
   }, [activeServerId]);
 
   const refreshCommandSessions = useCallback(async (force = false) => {
@@ -125,6 +145,28 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
     }
   }, [commandSessions.length, commandSessionsLoading, lastSessionFetchAt]);
 
+  const refreshCommandWorkDirs = useCallback(async (force = false) => {
+    if (!force && commandWorkDirsLoading) {
+      return;
+    }
+
+    const isFresh = Date.now() - lastWorkDirFetchAt < SESSION_CACHE_MS;
+    if (!force && isFresh && commandWorkDirs.length > 0) {
+      return;
+    }
+
+    setCommandWorkDirsLoading(true);
+    try {
+      const response = await getSessionWorkDirs();
+      setCommandWorkDirs(response.workDirs.filter(Boolean));
+      setLastWorkDirFetchAt(Date.now());
+    } catch (error) {
+      console.error('Failed to load command palette directories:', error);
+    } finally {
+      setCommandWorkDirsLoading(false);
+    }
+  }, [commandWorkDirs.length, commandWorkDirsLoading, lastWorkDirFetchAt]);
+
   const runSurfaceRefresh = useCallback(async (targetSessionId?: string) => {
     const currentSurface = surfaceRef.current;
     const currentFocusedSession = focusedSessionRef.current;
@@ -140,14 +182,14 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
     await refreshCommandSessions(true);
   }, [refreshCommandSessions]);
 
-  const requestNewSession = useCallback(() => {
+  const requestNewSession = useCallback((options?: NewSessionOptions) => {
     const currentSurface = surfaceRef.current;
     if (currentSurface?.openNewSession) {
-      currentSurface.openNewSession();
+      currentSurface.openNewSession(options);
       return;
     }
 
-    setPendingIntent({ type: 'new-session', targetView: 'kanban' });
+    setPendingIntent({ type: 'new-session', targetView: 'kanban', options });
     setViewMode('kanban');
   }, [setViewMode]);
 
@@ -163,6 +205,17 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
     setViewMode(targetView);
   }, [setViewMode, viewMode]);
 
+  const requestShowKanban = useCallback((options?: ShowKanbanOptions) => {
+    const currentSurface = surfaceRef.current;
+    if (currentSurface?.viewMode === 'kanban' && currentSurface.showKanban) {
+      currentSurface.showKanban(options);
+      return;
+    }
+
+    setPendingIntent({ type: 'show-kanban', targetView: 'kanban', options });
+    setViewMode('kanban');
+  }, [setViewMode]);
+
   const requestCloseModalSession = useCallback(() => {
     surfaceRef.current?.closeModalSession?.();
   }, []);
@@ -177,8 +230,9 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
 
   const openPalette = useCallback(() => {
     setPaletteOpen(true);
-    void refreshCommandSessions();
-  }, [refreshCommandSessions]);
+    void refreshCommandSessions(true);
+    void refreshCommandWorkDirs(true);
+  }, [refreshCommandSessions, refreshCommandWorkDirs]);
 
   const closePalette = useCallback(() => {
     setPaletteOpen(false);
@@ -205,12 +259,17 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
     }
 
     if (pendingIntent.type === 'new-session' && surface.openNewSession) {
-      surface.openNewSession();
+      surface.openNewSession(pendingIntent.options);
       setPendingIntent(null);
     }
 
     if (pendingIntent.type === 'open-session' && surface.openSession) {
       surface.openSession(pendingIntent.target);
+      setPendingIntent(null);
+    }
+
+    if (pendingIntent.type === 'show-kanban' && surface.showKanban) {
+      surface.showKanban(pendingIntent.options);
       setPendingIntent(null);
     }
   }, [pendingIntent, surface]);
@@ -221,13 +280,17 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
     closePalette,
     requestNewSession,
     requestOpenSession,
+    requestShowKanban,
     requestCloseModalSession,
     registerSurface,
     registerFocusedSession,
     focusedSession,
     commandSessions,
     commandSessionsLoading,
+    commandWorkDirs,
+    commandWorkDirsLoading,
     refreshCommandSessions,
+    refreshCommandWorkDirs,
     performSessionStatusChange,
     performSessionInterrupt,
     performSessionKill,

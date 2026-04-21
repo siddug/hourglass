@@ -8,7 +8,7 @@ import type { Session, SessionStatus } from '@/lib/api';
 
 interface CommandItem {
   id: string;
-  group: 'Actions' | 'Sessions' | 'Session Actions';
+  group: 'Actions' | 'Directories' | 'Sessions' | 'Session Actions';
   title: string;
   subtitle?: string;
   keywords: string[];
@@ -49,6 +49,14 @@ function getSessionLabel(session: Session): string {
 
 function getSessionSubtitle(session: Session): string {
   return `${SESSION_STATUS_LABELS[session.status]} · ${session.workDir}`;
+}
+
+function getShortPath(path: string): string {
+  const parts = path.split('/').filter(Boolean);
+  if (parts.length <= 2) {
+    return path;
+  }
+  return `.../${parts.slice(-2).join('/')}`;
 }
 
 function getQueryScore(query: string, fields: string[]): number {
@@ -113,10 +121,14 @@ export function CommandPalette() {
     closePalette,
     requestNewSession,
     requestOpenSession,
+    requestShowKanban,
     focusedSession,
     commandSessions,
     commandSessionsLoading,
+    commandWorkDirs,
+    commandWorkDirsLoading,
     refreshCommandSessions,
+    refreshCommandWorkDirs,
     performSessionStatusChange,
     performSessionInterrupt,
     performSessionKill,
@@ -129,11 +141,12 @@ export function CommandPalette() {
 
   useEffect(() => {
     void refreshCommandSessions();
+    void refreshCommandWorkDirs();
     window.requestAnimationFrame(() => {
       inputRef.current?.focus();
       inputRef.current?.select();
     });
-  }, [refreshCommandSessions]);
+  }, [refreshCommandSessions, refreshCommandWorkDirs]);
 
   const sessionMatches = useMemo(() => {
     const ranked = commandSessions
@@ -162,6 +175,26 @@ export function CommandPalette() {
   const currentSession = sessionMatches.length === 1
     ? sessionMatches[0].session
     : (focusedSession?.session ?? null);
+
+  const directoryMatches = useMemo(() => {
+    if (!query.trim()) {
+      return [];
+    }
+
+    return commandWorkDirs
+      .map((workDir) => ({
+        workDir,
+        score: getQueryScore(query, [workDir, getShortPath(workDir)]),
+      }))
+      .filter((match) => match.score >= 0)
+      .sort((a, b) => {
+        if (b.score !== a.score) {
+          return b.score - a.score;
+        }
+        return a.workDir.localeCompare(b.workDir);
+      })
+      .slice(0, 6);
+  }, [commandWorkDirs, query]);
 
   const actionItems = useMemo<CommandItem[]>(() => {
     const navigate = (mode: ViewMode, label: string, keywords: string[]): CommandItem => ({
@@ -214,6 +247,38 @@ export function CommandPalette() {
       },
     }));
   }, [closePalette, requestOpenSession, sessionMatches]);
+
+  const directoryItems = useMemo<CommandItem[]>(() => {
+    return directoryMatches.flatMap(({ workDir }) => {
+      const shortPath = getShortPath(workDir);
+      const encodedPath = encodeURIComponent(workDir);
+
+      return [
+        {
+          id: `dir-new-${encodedPath}`,
+          group: 'Directories',
+          title: `New Session in ${shortPath}`,
+          subtitle: workDir,
+          keywords: ['directory', 'folder', 'new', 'session', 'create', 'start', workDir, shortPath],
+          action: () => {
+            requestNewSession({ initialWorkDir: workDir });
+            closePalette();
+          },
+        },
+        {
+          id: `dir-kanban-${encodedPath}`,
+          group: 'Directories',
+          title: `Go to Kanban for ${shortPath}`,
+          subtitle: workDir,
+          keywords: ['directory', 'folder', 'kanban', 'board', 'filter', workDir, shortPath],
+          action: () => {
+            requestShowKanban({ workDirFilter: workDir });
+            closePalette();
+          },
+        },
+      ];
+    });
+  }, [closePalette, directoryMatches, requestNewSession, requestShowKanban]);
 
   const sessionActionItems = useMemo<CommandItem[]>(() => {
     if (!currentSession) {
@@ -349,10 +414,11 @@ export function CommandPalette() {
 
     return [
       ...filterItems(actionItems),
+      ...filterItems(directoryItems),
       ...filterItems(sessionActionItems),
       ...sessionItems,
     ];
-  }, [actionItems, query, sessionActionItems, sessionItems]);
+  }, [actionItems, directoryItems, query, sessionActionItems, sessionItems]);
 
   const resolvedActiveIndex = visibleItems.length === 0
     ? -1
@@ -366,7 +432,7 @@ export function CommandPalette() {
   const groupedItems = useMemo(() => {
     const groups: Array<{ label: CommandItem['group']; items: CommandItem[] }> = [];
 
-    for (const label of ['Actions', 'Session Actions', 'Sessions'] as const) {
+    for (const label of ['Actions', 'Directories', 'Session Actions', 'Sessions'] as const) {
       const items = visibleItems.filter((item) => item.group === label);
       if (items.length > 0) {
         groups.push({ label, items });
@@ -422,10 +488,10 @@ export function CommandPalette() {
                   closePalette();
                 }
               }}
-              placeholder="Search actions and sessions..."
+              placeholder="Search actions, directories, and sessions..."
               className="w-full bg-transparent text-sm text-hg-on-surface outline-none placeholder:text-hg-on-surface-variant/70"
             />
-            {commandSessionsLoading ? <Spinner className="h-4 w-4 text-hg-primary" /> : null}
+            {commandSessionsLoading || commandWorkDirsLoading ? <Spinner className="h-4 w-4 text-hg-primary" /> : null}
           </div>
         </div>
 
@@ -464,7 +530,13 @@ export function CommandPalette() {
                             ? 'bg-white/20 text-white'
                             : 'bg-hg-surface-container-high text-hg-on-surface-variant'
                         }`}>
-                          {item.group === 'Sessions' ? 'S' : item.group === 'Session Actions' ? 'SA' : 'A'}
+                          {item.group === 'Sessions'
+                            ? 'S'
+                            : item.group === 'Session Actions'
+                              ? 'SA'
+                              : item.group === 'Directories'
+                                ? 'D'
+                                : 'A'}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium">{item.title}</span>

@@ -101,6 +101,7 @@ export class ClaudeConnector extends AbstractConnector {
     // Use enableApprovals from options if provided, otherwise fall back to config
     const useInteractive = enableApprovals ?? this.claudeConfig.enableApprovals ?? false;
     const args = this.buildArgs(options, undefined, useInteractive, agentMode);
+    const processEnv = this.buildProcessEnv(env);
 
     // Create approval service for interactive mode
     const approvalService = useInteractive ? new ApprovalService() : undefined;
@@ -109,7 +110,7 @@ export class ClaudeConnector extends AbstractConnector {
       cwd: workDir,
       command,
       args,
-      env: this.mergeEnv(env),
+      env: processEnv,
       // In interactive mode, prompt is sent via stdin after spawn
       prompt: useInteractive ? prompt : undefined,
       startupTimeout,
@@ -130,6 +131,7 @@ export class ClaudeConnector extends AbstractConnector {
     // Use enableApprovals from options if provided, otherwise fall back to config
     const useInteractive = enableApprovals ?? this.claudeConfig.enableApprovals ?? false;
     const args = this.buildArgs(options, sessionId, useInteractive, agentMode);
+    const processEnv = this.buildProcessEnv(env);
 
     // Create approval service for interactive mode
     const approvalService = useInteractive ? new ApprovalService() : undefined;
@@ -138,7 +140,7 @@ export class ClaudeConnector extends AbstractConnector {
       cwd: workDir,
       command,
       args,
-      env: this.mergeEnv(env),
+      env: processEnv,
       // In interactive mode, prompt is sent via stdin after spawn
       prompt: useInteractive ? prompt : undefined,
       sessionId,
@@ -186,6 +188,49 @@ For more information, visit: https://docs.anthropic.com/claude-code
     const pkg = this.claudeConfig.package || '@anthropic-ai/claude-code';
     const version = this.claudeConfig.version;
     return version ? `${pkg}@${version}` : pkg;
+  }
+
+  /**
+   * Add compatibility env for gateway-backed Claude Code setups.
+   *
+   * Claude Code 2.1.x can send beta-only request fields (for example
+   * context management controls) that some gateways and proxies do not yet
+   * accept. Anthropic's gateway docs recommend disabling experimental betas
+   * in these environments.
+   */
+  private buildProcessEnv(env?: Record<string, string>): Record<string, string> {
+    const mergedEnv = this.mergeEnv(env);
+
+    if (this.shouldDisableExperimentalBetas(mergedEnv)) {
+      return {
+        ...mergedEnv,
+        CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS: '1',
+      };
+    }
+
+    return mergedEnv;
+  }
+
+  private shouldDisableExperimentalBetas(env: Record<string, string>): boolean {
+    const explicitOverride = env.CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS ?? process.env.CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS;
+    if (explicitOverride !== undefined) {
+      return false;
+    }
+
+    const effectiveEnv = {
+      ...process.env,
+      ...this.config.env,
+      ...env,
+    };
+
+    return Boolean(
+      effectiveEnv.CLAUDE_CODE_USE_FOUNDRY
+      || effectiveEnv.ANTHROPIC_FOUNDRY_BASE_URL
+      || effectiveEnv.ANTHROPIC_BASE_URL
+      || effectiveEnv.CLAUDE_CODE_USE_BEDROCK
+      || effectiveEnv.CLAUDE_CODE_USE_VERTEX
+      || effectiveEnv.AWS_BEARER_TOKEN_BEDROCK
+    );
   }
 
   /**
